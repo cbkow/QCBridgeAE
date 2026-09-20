@@ -1,0 +1,38 @@
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# PRIVACY: everything client-, job- or SDK-related stays local.
+#
+# private/ holds the Adobe SDKs (AE + Premiere headers are marked ADOBE
+# CONFIDENTIAL and must never be published), plus any note, probe script or
+# captured frame that references real client work. Same convention as the
+# minColor repo. The Windows machine gets its own SDK copy from Adobe's
+# developer site — the SDK does NOT travel through this repo.
+# ---------------------------------------------------------------------------
+private/
+
+# Debug frame dumps — client pixels. Never committed, never in the project tree.
+*.exr
+*.dpx
+captures/
+
+# Build artifacts
+build/
+build-*/
+out/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+install_manifest.txt
+*.o
+*.obj
+*.bundle
+*.aex
+*.prm
+*.dSYM/
+*.pdb
+*.ilk
