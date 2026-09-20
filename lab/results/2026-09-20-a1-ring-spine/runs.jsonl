@@ -1,0 +1,7 @@
+{"run":"publish-throughput","frame":"1080p","w":1920,"h":1080,"format":"RGBA16F","mb_per_frame":15.82,"ms_per_publish":0.24,"fps_ceiling":4151.2,"gb_per_s":68.9,"note":"memcpy from separate source buffer; real plugin converts in place"}
+{"run":"publish-throughput","frame":"uhd4k","w":3840,"h":2160,"format":"RGBA16F","mb_per_frame":63.28,"ms_per_publish":1.03,"fps_ceiling":967.4,"gb_per_s":64.2,"note":"memcpy from separate source buffer; real plugin converts in place"}
+{"run":"publish-throughput","frame":"6k","w":6144,"h":3240,"format":"RGBA16F","mb_per_frame":151.88,"ms_per_publish":2.62,"fps_ceiling":382.3,"gb_per_s":60.9,"note":"memcpy from separate source buffer; real plugin converts in place"}
+{"run":"ring-tearing","frames":20000,"slots":3,"payload_bytes":65536,"consumer_dwell_us":80,"seen":167,"skipped":19833,"torn":0,"desc_mismatch":0,"out_of_order":0,"result":"pass"}
+{"run":"ring-tearing-stability","iterations":20,"load":"idle","pass":20,"fail":0}
+{"run":"ring-tearing-stability","iterations":10,"load":"12 spinners on 18 cores","pass":10,"fail":0}
+{"run":"ring-unit","checks":28,"pass":28,"fail":0}
