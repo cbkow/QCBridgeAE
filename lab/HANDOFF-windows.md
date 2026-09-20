@@ -32,6 +32,26 @@ not chase it. The macOS number will look better because Apple Silicon has
 unified memory, not because the Windows code is wrong. Record both, note why
 they differ.
 
+## The 32 bpc conversion needs F16C
+
+Per `PLAN.md` D1, the 8 and 16 bpc tiers are carried natively and never
+converted — nothing to do there. The 32 bpc tier converts to half, and it must
+use **hardware** conversion: `_mm256_cvtps_ph` (F16C, on every x86-64 part
+since 2012). The portable scalar fallback measured **12.55 ms vs 2.67 ms** at
+4K on the macOS side — 4.7x, or ~80 fps versus ~374. The same gap will show up
+on x86 if the intrinsic isn't used.
+
+Texture formats for the three tiers: `DXGI_FORMAT_R8G8B8A8_UNORM`,
+`DXGI_FORMAT_R16G16B16A16_UNORM`, `DXGI_FORMAT_R16G16B16A16_FLOAT`. All three
+sample as `float4` through one shader, the same way they do in Metal — but
+**verify it rather than assuming**, the way `tests/texture_format_test.mm`
+does on the macOS side. That equivalence is what makes per-tier formats cheap,
+and if D3D11 doesn't give it to you for free, say so before working around it.
+
+Run `qcbae-convbench` on your hardware and put the numbers in `lab/results/`.
+The ratios may not survive the trip off unified memory, and if they don't, D1
+deserves revisiting for Windows specifically.
+
 ## Plugin install locations
 
 | | Path |
