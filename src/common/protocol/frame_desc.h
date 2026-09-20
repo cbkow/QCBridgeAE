@@ -18,7 +18,7 @@
 namespace qcbae {
 
 inline constexpr uint32_t kRingMagic        = 0x51434145u;  // 'QCAE'
-inline constexpr uint32_t kFrameDescVersion = 1u;
+inline constexpr uint32_t kFrameDescVersion = 2u;   // v2: channel_order
 
 inline constexpr uint32_t kMaxCompName = 128u;
 
@@ -48,6 +48,22 @@ enum class SourceTier : uint32_t {
     Int8    = 1,   // AE 8 bpc   — exact in half
     Int16   = 2,   // AE 16 bpc  — 0..32768, lossy above ~0.031 (PLAN.md D2/D3)
     Float32 = 3,   // AE 32 bpc  — clamped at 65504 (PLAN.md D4)
+};
+
+// After Effects stores pixels as ARGB, not RGBA — PF_Pixel8/16 lead with
+// alpha and PF_PixelFloat is {alpha, red, green, blue}. Reading an AE world as
+// RGBA rotates every channel.
+//
+// The wire keeps AE's order rather than fixing it on the CPU, because the
+// swizzle is free on the GPU (a shader swizzle, or MTLTextureSwizzleChannels)
+// and paying for it on the CPU would undo the whole reason the integer tiers
+// are a memcpy (PLAN.md D1). The consumer reorders; the producer states what
+// it sent.
+enum class ChannelOrder : uint32_t {
+    Unknown = 0,
+    RGBA    = 1,
+    ARGB    = 2,   // After Effects native
+    BGRA    = 3,   // several Premiere PrPixelFormats, for Route A later
 };
 
 enum FrameFlags : uint32_t {
@@ -126,7 +142,9 @@ struct FrameDesc {
     PixelFormat pixel_format;
 
     SourceTier source_tier;
+    ChannelOrder channel_order;
     uint32_t flags;
+    uint32_t _pad0;
 
     // AE comp time as an exact rational — never a float. A frame number is
     // not derivable from a double without rounding arguments nobody wins.
@@ -158,7 +176,7 @@ struct FrameDesc {
     char     comp_name[kMaxCompName];
 };
 
-static_assert(sizeof(FrameDesc) == 184, "FrameDesc is a wire format — size change needs a version bump");
+static_assert(sizeof(FrameDesc) == 192, "FrameDesc is a wire format — size change needs a version bump");
 
 // AE 16 bpc: PF_MAX_CHAN16 is 32768, the unorm container is 65535.
 inline constexpr float kAE16ValueScale = 65535.0f / 32768.0f;

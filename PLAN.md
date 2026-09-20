@@ -132,6 +132,16 @@ Route B is fully specified by headers already on disk:
 `AEGP_RenderAndCheckoutFrame` → `AEGP_FrameReceiptH` → `AEGP_WorldH`, with
 `AEGP_SetWorldType(AEGP_WorldType_32)`.
 
+**Route B's ceiling, measured in A2.** `AEGP_RenderAndCheckoutFrame` is
+synchronous on AE's UI thread, and the AsyncManager that would fix it is
+reachable only through `PF_GetContextAsyncManager` in
+`PF_EffectCustomUISuite2` — DRAW-event specific, belonging to effects with
+custom UI. An AEGP cannot get one. A trivial 1280×720 comp costs ~30 ms of
+render per frame; a heavy comp blocks AE for as long as its frame takes.
+Throttling bounds how often we pay that, not how much. **A4 should weigh this
+more heavily than the original comparison did**: Route A pushes frames AE has
+already rendered and never asks the host for work.
+
 Known Route A risk: the Transmit host has a **"Disable video output when in the
 background"** preference. The whole premise here is that the user is looking at
 QCView, not at AE. If that default stops the stream on focus loss, Route A has
@@ -179,7 +189,7 @@ keyed-mutex option in A5 is an alternative to this, not an addition.
 | Phase | Deliverable | Exit criteria |
 | --- | --- | --- |
 | **A1 Spine** ✅ | Shared-memory ring + sidecar + throwaway Metal viewer. No AE involved | ~~Synthetic frames land in the viewer; surfaces recycle without tearing~~ **Done 2026-09-20** — `lab/results/2026-09-20-a1-ring-spine/`, `-a1b-metal-probe/` |
-| **A2 AEGP tap** | AEGP plugin: render active comp to a 32f world on idle, convert, publish. macOS | A live AE comp appears in the probe viewer, bit-exact for 8bpc |
+| **A2 AEGP tap** ✅ | AEGP plugin: render the active comp on idle, convert, publish. macOS | ~~A live AE comp appears in the probe viewer, bit-exact for 8bpc~~ **Done 2026-09-20** — bit-exact for 8 **and** 16 bpc, ICC sidecar live. `lab/results/2026-09-20-a2-aegp-tap/` |
 | **A3 QCView ingest** | Float inlet in QCView (new construction — everything there arrives via libavcodec today); OCIO Input driven by the sidecar ICC | Comp is live in QCView as a media item; OCIO engaged; A/B against an approved render works |
 | **A4 Transmit probe** | Premiere SDK; build its Transmit sample; log the `PrPixelFormat` list the host actually offers, under **both** AE and Premiere | Go / no-go on Route A, recorded in `lab/results/` |
 | **A5 Windows parity** | DXGI shared texture + keyed mutex; MSVC build of A1–A2 | Windows probe viewer matches macOS behaviour |
@@ -201,16 +211,21 @@ governs the shared notes folder.
 2. **`lab/` is committed, therefore public.** No client names, job codes, comp
    names, project paths, hostnames or frame captures. Findings are written in
    neutral terms ("a 4K comp, ~30 layers").
-3. **The product never writes pixels to disk.** Debug frame dumps are an
+3. **Installing needs no admin.** AE loads AEGPs from
+   `/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/`, which
+   is group-admin writable, provided `CFBundlePackageType` is `AEgx`. The same
+   folder serves a Transmit plugin (D6), so one install location covers both
+   routes and neither needs privilege escalation.
+4. **The product never writes pixels to disk.** Debug frame dumps are an
    explicit opt-in, land in the OS temp dir, and never touch the project tree
    or this repo.
-4. **No network code, at all.** Same-machine IPC only — Mach port / named pipe,
+5. **No network code, at all.** Same-machine IPC only — Mach port / named pipe,
    no sockets, no listeners. Nothing to firewall, nothing to pair, no TOFU
    design like QCBridge needed. This is a deliberate invariant: if a change
    wants a socket, the change is wrong.
-5. **Logs carry no project paths or comp names by default.** The comp name
+6. **Logs carry no project paths or comp names by default.** The comp name
    travels in the sidecar (in memory, to QCView) — not to a log file.
-6. **License: MIT**, matching minColor, because a proprietary-SDK plugin under
+7. **License: MIT**, matching minColor, because a proprietary-SDK plugin under
    GPL is a fight nobody needs. QCView is GPL-3.0, so the QCView-side ingest
    code lives in **that** repo under **its** license. The boundary is the
    shared surface. *(Open: confirm before first public push.)*

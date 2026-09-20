@@ -1,0 +1,6 @@
+{"run":"tier-exactness","tier":"8bpc","wire":"RGBA8Unorm","expected":[38,89,153,242,191,26],"got":[38,89,153,242,191,26],"result":"bit-exact"}
+{"run":"tier-exactness","tier":"16bpc","wire":"RGBA16Unorm","expected":[4915,11469,19661,31130,24576,3277],"got":[4915,11469,19661,31130,24576,3277],"alpha":32768,"value_scale":1.999969,"result":"bit-exact"}
+{"run":"tier-exactness","tier":"32bpc","wire":"RGBA16F","source":[0.15,0.35,0.60,0.95,0.75,0.10],"got":[0.14990,0.34985,0.59961,0.94971,0.75000,0.09998],"result":"nearest-half, as designed (PLAN D2)"}
+{"run":"icc-sidecar","bytes":624,"generation":1,"colorspace_field":"RGB ","source":"AEGP_ColorSettingsSuite6 AEGP_GetNewWorkingSpaceColorProfile"}
+{"run":"render-cadence","comp":"1280x720, 3 solids","throttle_ms":100,"frames":100,"seconds":13,"ms_per_cycle":130,"ms_render_and_publish":30,"note":"synchronous on AE's UI thread; AsyncManager unavailable to an AEGP"}
+{"run":"install","path":"/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/","admin_required":false,"gate":"CFBundlePackageType must be AEgx"}

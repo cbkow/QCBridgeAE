@@ -31,6 +31,74 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
+# qcbae-aegp — the After Effects tap (phase A2, Route B).
+#
+# Needs the AE SDK, which is Adobe Confidential and never enters this repo
+# (PLAN.md §Privacy 1). Point QCBAE_AE_SDK at your own copy; the default is
+# the documented private/ location. Everything else in this project builds
+# without it, so a machine with no SDK still gets the spine and its tests.
+#
+# Bundle mechanics follow the ordering minColor learned the hard way: Rez the
+# PiPL, copy the .rsrc in, THEN codesign — copying after the linker seals the
+# bundle ships an invalid signature. The .rsrc is a link dependency so a
+# PiPL-only edit actually refreshes the bundle.
+# ---------------------------------------------------------------------------
+set(QCBAE_AE_SDK "${CMAKE_CURRENT_SOURCE_DIR}/private/sdk/AfterEffectsSDK"
+    CACHE PATH "After Effects SDK root (not included; see PLAN.md)")
+set(_ae_headers "${QCBAE_AE_SDK}/Examples/Headers")
+
+if(APPLE AND EXISTS "${_ae_headers}/AE_Effect.h")
+    message(STATUS "AE SDK found: ${QCBAE_AE_SDK}")
+    find_program(REZ_TOOL Rez)
+    set(QCBAE_CODESIGN_IDENTITY "-" CACHE STRING "codesign identity (- = ad-hoc)")
+    if(QCBAE_CODESIGN_IDENTITY STREQUAL "-")
+        set(_sign_flags --force --deep --sign -)
+    else()
+        set(_sign_flags --force --deep --options runtime --timestamp --sign "${QCBAE_CODESIGN_IDENTITY}")
+    endif()
+
+    add_library(qcbae-aegp MODULE src/aegp/qcbae_aegp.cpp)
+    target_link_libraries(qcbae-aegp PRIVATE qcbae_common)
+    target_include_directories(qcbae-aegp PRIVATE
+        "${_ae_headers}" "${_ae_headers}/SP" "${QCBAE_AE_SDK}/Examples/Util")
+    set_target_properties(qcbae-aegp PROPERTIES
+        BUNDLE TRUE
+        BUNDLE_EXTENSION "plugin"
+        OUTPUT_NAME "QCBridgeAE"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/src/aegp/Info.plist.in")
+    # Without the explicit export, -dead_strip removes the entry point the
+    # PiPL names and AE silently fails to bind the plugin.
+    target_link_options(qcbae-aegp PRIVATE "-Wl,-exported_symbol,_EntryPointFunc" "-Wl,-dead_strip")
+
+    set(_rsrc "${CMAKE_CURRENT_BINARY_DIR}/QCBridgeAE.rsrc")
+    add_custom_command(OUTPUT "${_rsrc}"
+        COMMAND ${REZ_TOOL} "${CMAKE_CURRENT_SOURCE_DIR}/src/aegp/QCBridgeAE_PiPL.r"
+                -o "${_rsrc}" -useDF
+                -i "${_ae_headers}" -i "${QCBAE_AE_SDK}/Examples/Resources"
+                -i "${QCBAE_AE_SDK}/Examples/Util"
+        DEPENDS src/aegp/QCBridgeAE_PiPL.r
+        COMMENT "Rez PiPL (qcbae-aegp)")
+    add_custom_target(qcbae-aegp_pipl DEPENDS "${_rsrc}")
+    add_dependencies(qcbae-aegp qcbae-aegp_pipl)
+    # Both the PiPL and the Info.plist must force a relink. POST_BUILD (rsrc
+    # copy + codesign) only runs on relink, so editing either one otherwise
+    # leaves a bundle whose signature no longer matches its contents —
+    # "invalid Info.plist (plist or signature have been modified)". Hit that
+    # once changing CFBundlePackageType; ninja reported no work to do.
+    set_property(TARGET qcbae-aegp APPEND PROPERTY LINK_DEPENDS "${_rsrc}")
+    set_property(TARGET qcbae-aegp APPEND PROPERTY LINK_DEPENDS
+                 "${CMAKE_CURRENT_SOURCE_DIR}/src/aegp/Info.plist.in")
+    add_custom_command(TARGET qcbae-aegp POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_DIR:qcbae-aegp>/Contents/Resources"
+        COMMAND ${CMAKE_COMMAND} -E copy "${_rsrc}" "$<TARGET_BUNDLE_DIR:qcbae-aegp>/Contents/Resources/QCBridgeAE.rsrc"
+        COMMAND codesign ${_sign_flags} "$<TARGET_BUNDLE_DIR:qcbae-aegp>"
+        COMMAND codesign --verify --deep --strict "$<TARGET_BUNDLE_DIR:qcbae-aegp>"
+        COMMENT "PiPL into bundle, then codesign" VERBATIM)
+else()
+    message(STATUS "AE SDK not found at ${QCBAE_AE_SDK} — skipping qcbae-aegp (everything else still builds)")
+endif()
+
+# ---------------------------------------------------------------------------
 # qcbae-probe — synthetic producer + Metal viewer (phase A1b, macOS only).
 # Throwaway: `produce` is replaced by the AE plugin in A2, `view` by QCView in
 # A3. It exists so the transport can be watched before anything depends on it.

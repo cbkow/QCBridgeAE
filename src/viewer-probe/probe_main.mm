@@ -138,6 +138,7 @@ int run_producer(uint32_t w, uint32_t h, double fps, SourceTier tier) {
         d.pixel_format = fmt;
         d.source_tier  = tier;
         d.value_scale  = (tier == SourceTier::Int16) ? kAE16ValueScale : 1.0f;
+        d.channel_order = ChannelOrder::RGBA;   // the synthetic producer is RGBA
         d.flags        = kFlagPremultiplied;
         d.time_value   = static_cast<int64_t>(frame);
         d.time_scale   = 24;
@@ -150,6 +151,75 @@ int run_producer(uint32_t w, uint32_t h, double fps, SourceTier tier) {
         next += std::chrono::duration_cast<std::chrono::steady_clock::duration>(period);
         std::this_thread::sleep_until(next);
     }
+}
+
+// ---------------------------------------------------------------------------
+// dump — read the ring and print what is actually in it.
+//
+// The viewer proves frames arrive; it cannot prove they arrived unaltered,
+// because a window shows the display pipeline's opinion of the pixels. This
+// prints the bytes, which is what "bit-exact" has to mean.
+// ---------------------------------------------------------------------------
+int run_dump(int argc, const char** argv) {
+    SharedRing ring;
+    if (!ring.open(kRingName)) {
+        std::fprintf(stderr, "dump: %s\n", ring.error().c_str());
+        return 1;
+    }
+    uint64_t last_seen = 0;
+    FrameDesc d{};
+    const void* pixels = nullptr;
+    for (int attempt = 0; attempt < 400; ++attempt) {
+        if (ring.acquire_latest(&last_seen, &d, &pixels)) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    if (pixels == nullptr) { std::fprintf(stderr, "dump: no frame published\n"); return 1; }
+
+    const char* fmt = d.pixel_format == PixelFormat::RGBA8Unorm  ? "RGBA8Unorm"
+                    : d.pixel_format == PixelFormat::RGBA16Unorm ? "RGBA16Unorm"
+                    : d.pixel_format == PixelFormat::RGBA32Float ? "RGBA32Float"
+                    : d.pixel_format == PixelFormat::RGBA16F     ? "RGBA16F" : "?";
+    const char* ord = d.channel_order == ChannelOrder::ARGB ? "ARGB"
+                    : d.channel_order == ChannelOrder::BGRA ? "BGRA" : "RGBA";
+    std::printf("seq %llu  %ux%u  %s  order %s  tier %u  scale %.6f  row %u\n",
+                (unsigned long long)last_seen, d.width, d.height, fmt, ord,
+                (unsigned)d.source_tier, d.value_scale, d.bytes_per_row);
+    std::printf("time %lld/%lld  premult %d  comp \"%s\"\n",
+                (long long)d.time_value, (long long)d.time_scale,
+                (d.flags & kFlagPremultiplied) ? 1 : 0, d.comp_name);
+
+    std::string icc;
+    const uint64_t gen = ring.read_icc_profile(0, &icc);
+    std::printf("working-space ICC: %zu bytes (generation %llu)%s\n",
+                icc.size(), (unsigned long long)gen,
+                icc.size() >= 84 ? ("  desc='" + std::string(icc.substr(16, 4)) + "'").c_str() : "");
+
+    // Sample points given as x,y pairs on the command line.
+    std::printf("\nsamples (as stored, AE channel order):\n");
+    for (int i = 2; i + 1 < argc; i += 2) {
+        const uint32_t x = (uint32_t)std::atoi(argv[i]), y = (uint32_t)std::atoi(argv[i + 1]);
+        if (x >= d.width || y >= d.height) { std::printf("  (%u,%u) out of range\n", x, y); continue; }
+        const auto* row = static_cast<const uint8_t*>(pixels) + (size_t)y * d.bytes_per_row;
+        if (d.pixel_format == PixelFormat::RGBA8Unorm) {
+            const uint8_t* p = row + x * 4;
+            std::printf("  (%4u,%4u)  A=%3u R=%3u G=%3u B=%3u\n", x, y, p[0], p[1], p[2], p[3]);
+        } else if (d.pixel_format == PixelFormat::RGBA16Unorm) {
+            const auto* p = reinterpret_cast<const uint16_t*>(row) + x * 4;
+            std::printf("  (%4u,%4u)  A=%5u R=%5u G=%5u B=%5u   (AE white = 32768)\n",
+                        x, y, p[0], p[1], p[2], p[3]);
+        } else {
+            const auto* p = reinterpret_cast<const uint16_t*>(row) + x * 4;
+            auto h2f = [](uint16_t h) {
+                const int e = ((h >> 10) & 0x1F) - 15 + 127;
+                const uint32_t b = ((uint32_t)(h & 0x8000u) << 16) | ((uint32_t)e << 23)
+                                 | ((uint32_t)(h & 0x3FFu) << 13);
+                float f; std::memcpy(&f, &b, 4); return (h & 0x7FFFu) ? f : 0.0f; };
+            std::printf("  (%4u,%4u)  A=%.5f R=%.5f G=%.5f B=%.5f\n",
+                        x, y, h2f(p[0]), h2f(p[1]), h2f(p[2]), h2f(p[3]));
+        }
+    }
+    ring.release();
+    return 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,14 +240,24 @@ vertex VSOut v_main(uint vid [[vertex_id]]) {
     return o;
 }
 
+struct Sidecar { float value_scale; uint channel_order; };
+
 fragment float4 f_main(VSOut in [[stage_in]],
                        texture2d<float> tex [[texture(0)]],
-                       constant float& value_scale [[buffer(0)]]) {
+                       constant Sidecar& sc [[buffer(0)]]) {
     constexpr sampler s(filter::nearest, address::clamp_to_edge);
+    float4 c = tex.sample(s, in.uv);
+
+    // After Effects stores ARGB, so a texture read lands every channel one
+    // slot over. Reordering here is free; doing it on the CPU would undo the
+    // memcpy that makes the integer tiers cheap.
+    if (sc.channel_order == 2u) c = c.gbar;        // ARGB -> RGBA
+    else if (sc.channel_order == 3u) c = c.bgra;   // BGRA -> RGBA
+
     // value_scale is a container correction, not a look: AE 16bpc white is
     // 32768 in a 0..65535 unorm. Applied unconditionally, never per-format.
-    // Beyond it, deliberately no transform. See the file header.
-    return tex.sample(s, in.uv) * float4(value_scale, value_scale, value_scale, 1.0);
+    // Beyond these two, deliberately no transform. See the file header.
+    return float4(c.rgb * sc.value_scale, c.a);
 }
 )";
 
@@ -316,8 +396,11 @@ fragment float4 f_main(VSOut in [[stage_in]],
         id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rp];
         [enc setRenderPipelineState:_pipeline];
         [enc setFragmentTexture:tex atIndex:0];
-        float scale = d.value_scale > 0.0f ? d.value_scale : 1.0f;
-        [enc setFragmentBytes:&scale length:sizeof(scale) atIndex:0];
+        struct { float value_scale; uint32_t channel_order; } sc {
+            d.value_scale > 0.0f ? d.value_scale : 1.0f,
+            static_cast<uint32_t>(d.channel_order),
+        };
+        [enc setFragmentBytes:&sc length:sizeof(sc) atIndex:0];
         [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [enc endEncoding];
         [cb presentDrawable:drawable];
@@ -392,6 +475,7 @@ int main(int argc, const char** argv) {
         }
         return run_producer(w, h, fps, tier);
     }
+    if (mode == "dump") return run_dump(argc, argv);
     if (mode == "view") {
         @autoreleasepool {
             [NSApplication sharedApplication];
@@ -405,6 +489,7 @@ int main(int argc, const char** argv) {
     std::fprintf(stderr,
         "usage:\n"
         "  qcbae-probe produce [--width W] [--height H] [--fps N]\n"
-        "  qcbae-probe view\n");
+        "  qcbae-probe view\n"
+        "  qcbae-probe dump [x y]...\n");
     return 2;
 }
