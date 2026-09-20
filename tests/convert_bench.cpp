@@ -99,6 +99,10 @@ int main() {
     });
 
     std::printf("\nAE 32 bpc float source:\n");
+    std::vector<float> dst32(N);
+    bench("-> RGBA32Float (native, memcpy)", N * 8, [&] {
+        std::memcpy(dst32.data(), src32.data(), N * 4); keep(dst32.data());
+    });
     bench("-> RGBA16F portable", N * 6, [&] {
         for (size_t i = 0; i < N; ++i) {
             const float v = src32[i];

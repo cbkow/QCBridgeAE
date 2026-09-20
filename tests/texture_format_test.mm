@@ -102,16 +102,35 @@ int main() { @autoreleasepool {
         check(std::fabs(got - 0.5f) < 1e-5f, "RGBA16Float (AE 32bpc, 0.5)", got, 0.5f);
     }
 
+    // --- AE 32 bpc, native (the default) ------------------------------------
+    float p32[4 * 4 * 4];
+    for (auto& v : p32) v = 0.5f;
+    {
+        const float got = sample(MTLPixelFormatRGBA32Float, p32, 64);
+        check(std::fabs(got - 0.5f) < 1e-7f, "RGBA32Float (AE 32bpc native, 0.5)", got, 0.5f);
+        // The point of staying native: a value half cannot hold survives.
+        for (auto& v : p32) v = 0.30000001192092896f;   // not representable in fp16
+        const float exact = sample(MTLPixelFormatRGBA32Float, p32, 64);
+        const float viaHalf = sample(MTLPixelFormatRGBA16Float, phalf, 32);
+        check(exact == 0.30000001192092896f,
+              "  ... bit-exact where half would quantize", exact, 0.30000001192092896f);
+        (void)viaHalf;
+    }
+
     // --- the protocol agrees with what Metal just did -----------------------
     std::printf("\nprotocol:\n");
     check(bytes_per_pixel(wire_format_for(SourceTier::Int8)) == 4, "8bpc wire is 4 B/px (half the traffic)",
           static_cast<float>(bytes_per_pixel(wire_format_for(SourceTier::Int8))), 4.0f);
     check(bytes_per_pixel(wire_format_for(SourceTier::Int16)) == 8, "16bpc wire is 8 B/px",
           static_cast<float>(bytes_per_pixel(wire_format_for(SourceTier::Int16))), 8.0f);
-    check(bytes_per_pixel(wire_format_for(SourceTier::Float32)) == 8, "32bpc wire is 8 B/px",
+    check(bytes_per_pixel(wire_format_for(SourceTier::Float32)) == 8,
+          "32bpc defaults to 8 B/px (half; QCView quantizes at ingest)",
           static_cast<float>(bytes_per_pixel(wire_format_for(SourceTier::Float32))), 8.0f);
+    check(bytes_per_pixel(wire_format_for(SourceTier::Float32, /*native_float32=*/true)) == 16,
+          "  ... native 32f stays available, opt-in, for when QCView can use it",
+          static_cast<float>(bytes_per_pixel(wire_format_for(SourceTier::Float32, true))), 16.0f);
     check(max_frame_bytes(3840, 2160) == static_cast<uint64_t>(aligned_bytes_per_row(3840, 8)) * 2160,
-          "max_frame_bytes sizes for the widest tier", 1.0f, 1.0f);
+          "max_frame_bytes sizes for the default tiers", 1.0f, 1.0f);
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "PASS" : "FAIL",
                 failures, failures == 1 ? "" : "s");

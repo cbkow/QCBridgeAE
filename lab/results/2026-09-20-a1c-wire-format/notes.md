@@ -95,3 +95,49 @@ The 8 bpc row landing 1 lower at two points is its 256 levels, as expected.
   mid-session bit-depth change needs no rebuild. The texture cache is keyed on
   format as well as geometry for the same reason. Untested against an actual
   tier change — A2, when a real AE project can switch.
+
+## Addendum — native 32 bpc reassessed, and confirmed as stop-down
+
+Question raised after the above: QCView not having a 32f flow *yet* is a weak
+reason to quantize permanently. Would native be faster anyway?
+
+Measured, 4K:
+
+| 32 bpc wire | CPU produce | GPU sample | ceiling | bytes/frame |
+| --- | ---: | ---: | ---: | ---: |
+| `RGBA16F` (converted) | 2.40 ms | 0.40 ms | ~417 fps | 63.3 MB |
+| `RGBA32Float` (native) | 2.60 ms | 0.56 ms | ~385 fps | 126.6 MB |
+
+**Full native-32f potential at 4K is ~385 fps**, CPU-bound on the copy. Speed
+is not the deciding factor — ~8% CPU and 0.16 ms GPU are noise against
+anything AE produces. (Note: the earlier single reading of "2.65 vs 2.67,
+statistically identical" was noise-level. Repeated across resolutions,
+converting holds a consistent small edge. Same direction, smaller claim.)
+
+Footprint is the deciding factor:
+
+| 3-slot ring | 1080p | 4K | 6K | 8K |
+| --- | ---: | ---: | ---: | ---: |
+| `RGBA32Float` | 95 MB | 380 MB | 911 MB | **1519 MB** |
+| `RGBA16F` | 47 MB | 190 MB | 456 MB | 759 MB |
+
+Decision (chris): stay with 16F for the 32 bpc tier. The reasoning that
+settles it is not speed and not memory alone — it is that **QCView quantizes
+to 16F at ingest today**, so native would pay 2× memory to carry bits that are
+discarded at the door.
+
+`wire_format_for(tier, native_float32=true)` keeps the lossless path built and
+tested, including a check that a value half cannot represent survives
+bit-exact. The trigger to flip the default is written into the header: QCView
+gaining a 32f pipeline.
+
+## Where this leaves the wire
+
+- **8 bpc — bit-exact.** Native, memcpy, no conversion.
+- **16 bpc — bit-exact.** Native, all 15 bits, `value_scale` corrects the
+  0..32768 container.
+- **32 bpc — one conversion**, consciously chosen, reversible by a flag.
+
+Two of three tiers went from lossy to lossless in the course of this
+reassessment. The third was re-examined and confirmed rather than assumed,
+which is the part that was missing the first time.

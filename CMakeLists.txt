@@ -50,6 +50,13 @@ endif()
 add_executable(qcbae-convbench tests/convert_bench.cpp)
 target_link_libraries(qcbae-convbench PRIVATE qcbae_common)
 
+if(APPLE)
+    add_executable(qcbae-gpubench tests/gpu_sample_bench.mm)
+    target_link_libraries(qcbae-gpubench PRIVATE qcbae_common
+        "-framework Metal" "-framework Foundation")
+    target_compile_options(qcbae-gpubench PRIVATE -fobjc-arc)
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
     # Cross-process, so it needs fork(); the Windows port arrives with A5.

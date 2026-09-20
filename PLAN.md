@@ -31,7 +31,7 @@ everything.)*
 | --- | --- | --- |
 | 8 bpc | `RGBA8Unorm` | memcpy, exact, **half the wire bytes** (31.6 vs 63.3 MB at 4K) |
 | 16 bpc | `RGBA16Unorm` | memcpy, and keeps all 15 bits instead of ~11 |
-| 32 bpc | `RGBA16F` | converted; QCView has no 32f flow (D2) |
+| 32 bpc | `RGBA16F` | converted — **not for speed**; see below |
 
 Measured at 4K (`tests/convert_bench.cpp`, `lab/results/2026-09-20-a1c-wire-format/`):
 converting the integer tiers to half costs **4.4× for 8 bpc** (0.66 → 2.90 ms)
@@ -45,14 +45,33 @@ because the texture unit normalizes integer formats in hardware — verified in
 `tests/texture_format_test.mm`. Per-tier costs a `pixelFormat` switch and one
 uniform, not a code path.
 
+**Why 32 bpc converts, when native is nearly free.** Measured at 4K, native
+`RGBA32Float` costs ~8% more CPU (2.60 vs 2.40 ms) and 0.16 ms more GPU (0.56
+vs 0.40) — noise either way, and a ~385 fps ceiling fully native. The reason is
+footprint against benefit: **QCView quantizes to 16F at ingest today**, so a
+native wire pays 2× the memory to carry bits discarded at the door.
+
+| 3-slot ring | 1080p | 4K | 6K | 8K |
+| --- | ---: | ---: | ---: | ---: |
+| `RGBA32Float` | 95 MB | 380 MB | 911 MB | 1519 MB |
+| `RGBA16F` | 47 MB | 190 MB | 456 MB | 759 MB |
+
+`wire_format_for(tier, native_float32=true)` keeps the lossless path built and
+tested. **The trigger to flip it: QCView gaining a 32f pipeline.** At that
+point the bits stop being discarded, 2× memory buys 13 bits of significand, and
+it is a flag rather than a rewrite.
+
 **The 32 bpc path needs hardware half conversion**, not a portable fallback:
 12.55 ms scalar vs 2.67 ms with NEON `vcvt_f16_f32` at 4K (~80 vs ~374 fps).
 The x86 equivalent is F16C `_mm256_cvtps_ph`, available since 2012. The integer
 tiers sidestep the question entirely by never converting.
 
 **D2 — Accepted precision losses, written down on purpose.**
-- 32f → 16f: 24-bit significand to 11-bit. Accepted (chris, 2026-09-20) —
-  QCView has no 32F flow today. **This is the only remaining conversion loss.**
+- 32f → 16f: 24-bit significand to 11-bit. Accepted (chris, 2026-09-20),
+  re-examined against measurements the same day and **confirmed**: native is
+  nearly free in time but doubles ring memory to feed bits QCView discards at
+  ingest. **This is the only remaining conversion loss on the wire** — 8 and
+  16 bpc are now bit-exact end to end.
 - 16bpc: ~~up to 16× coarser just under white~~ **no longer lost on the wire**
   (D1 revision) — `RGBA16Unorm` carries all 15 bits. Whether they survive
   *inside* QCView depends on where it quantizes to 16F: if OCIO runs in the

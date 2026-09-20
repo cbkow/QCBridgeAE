@@ -6,3 +6,13 @@
 {"run":"convert-4k","tier":"32bpc","target":"RGBA16F","mode":"NEON vcvt_f16_f32","ms":2.67,"fps":374.4,"speedup_vs_portable":4.7}
 {"run":"texture-format","device":"Apple M5 Max","checks":9,"pass":9,"fail":0,"result":"one texture2d<float> pipeline samples RGBA8Unorm, RGBA16Unorm and RGBA16Float identically; value_scale recovers AE white to 1.000000"}
 {"run":"probe-tier-parity","metric":"sampled luma at three heights","rgba8":[84,122,159],"rgba16unorm":[84,123,160],"rgba16f":[84,123,160],"note":"within 1 LSB; without value_scale the 16bpc row would read ~half"}
+{"run":"native32f-vs-half","res":"1080p","native_ms":0.65,"half_ms":0.60,"native_fps":1543.7,"half_fps":1678.6}
+{"run":"native32f-vs-half","res":"uhd4k","native_ms":2.60,"half_ms":2.40,"native_fps":384.7,"half_fps":416.9}
+{"run":"native32f-vs-half","res":"6k","native_ms":6.23,"half_ms":5.77,"native_fps":160.4,"half_fps":173.4}
+{"run":"native32f-vs-half","res":"8k","native_ms":11.23,"half_ms":10.68,"native_fps":89.0,"half_fps":93.6}
+{"run":"gpu-sample-4k","format":"RGBA8Unorm","ms":0.40,"fps":2486.6,"source_mb":31.6}
+{"run":"gpu-sample-4k","format":"RGBA16Unorm","ms":0.40,"fps":2497.8,"source_mb":63.3}
+{"run":"gpu-sample-4k","format":"RGBA16Float","ms":0.40,"fps":2483.7,"source_mb":63.3}
+{"run":"gpu-sample-4k","format":"RGBA32Float","ms":0.56,"fps":1784.8,"source_mb":126.6}
+{"run":"ring-footprint-3slot","rgba32float_mb":{"1080p":95,"uhd4k":380,"6k":911,"8k":1519},"rgba16f_mb":{"1080p":47,"uhd4k":190,"6k":456,"8k":759}}
+{"run":"decision","tier":"32bpc","choice":"RGBA16F","reason":"QCView quantizes to 16F at ingest; native pays 2x memory for bits discarded at the door","trigger_to_revisit":"QCView gaining a 32f pipeline","escape_hatch":"wire_format_for(tier, native_float32=true)"}
