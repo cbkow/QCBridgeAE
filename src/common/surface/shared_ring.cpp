@@ -51,7 +51,7 @@ void SharedRing::close() {
 
 SlotHeader* SharedRing::slot_at(uint32_t index) const {
     auto* bytes = static_cast<uint8_t*>(base_);
-    return reinterpret_cast<SlotHeader*>(bytes + sizeof(RingHeader) + header_->icc_capacity
+    return reinterpret_cast<SlotHeader*>(bytes + header_->slots_offset
                                          + index * header_->slot_stride);
 }
 
@@ -106,6 +106,7 @@ bool SharedRing::create(const std::string& name, uint64_t pixels_capacity,
     header_->pixels_capacity = pix_cap;
     header_->icc_offset      = head_bytes;
     header_->icc_capacity    = icc_capacity;
+    header_->slots_offset    = head_bytes + icc_capacity;
     header_->total_size      = total;
     // header_ atomics are zeroed by the memset above, which is the intended
     // initial state (latest = 0 means "nothing published yet").
@@ -175,7 +176,7 @@ void* SharedRing::begin_write(uint64_t bytes) {
 
     writing_slot_ = index;
     write_seq_    = next;
-    return static_cast<uint8_t*>(base_) + sizeof(RingHeader) + header_->icc_capacity
+    return static_cast<uint8_t*>(base_) + header_->slots_offset
          + index * header_->slot_stride + header_->pixels_offset;
 }
 
@@ -223,7 +224,7 @@ bool SharedRing::acquire_latest(uint64_t* last_seen, FrameDesc* out_desc, const 
     *last_seen = seq;
     if (out_desc != nullptr) *out_desc = desc;
     if (out_pixels != nullptr) {
-        *out_pixels = static_cast<const uint8_t*>(base_) + sizeof(RingHeader) + header_->icc_capacity
+        *out_pixels = static_cast<const uint8_t*>(base_) + header_->slots_offset
                     + index * header_->slot_stride + header_->pixels_offset;
     }
     return true;

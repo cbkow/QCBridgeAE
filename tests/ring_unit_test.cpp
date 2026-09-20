@@ -34,8 +34,22 @@ int main() {
     SharedRing producer;
     check(producer.create("/qcbae-unit", 64 * 1024), "creates a ring");
     check(producer.header()->slot_count == kDefaultSlots, "defaults to 3 slots");
-    check(producer.header()->pixels_offset % static_cast<uint64_t>(getpagesize()) == 0,
-          "pixel region is page-aligned (MTLBuffer bytesNoCopy needs it)");
+    // The intra-slot offset being aligned proves nothing; what matters is the
+    // ADDRESS the GPU is handed. Checking the proxy instead of the real thing
+    // is how a 16-byte misalignment reached Metal in the first place.
+    {
+        const uint64_t ps = static_cast<uint64_t>(getpagesize());
+        check(producer.header()->pixels_offset % ps == 0, "pixel offset within a slot is page-aligned");
+        check(producer.header()->slots_offset % ps == 0, "slot region starts on a page boundary");
+        bool every_slot_aligned = true;
+        for (uint32_t i = 0; i < producer.header()->slot_count; ++i) {
+            void* p = producer.begin_write(256);
+            if (p == nullptr || reinterpret_cast<uintptr_t>(p) % ps != 0) every_slot_aligned = false;
+            producer.abandon();
+        }
+        check(every_slot_aligned,
+              "every slot's pixel ADDRESS is page-aligned (MTLBuffer bytesNoCopy)");
+    }
 
     check(producer.begin_write(1024 * 1024) == nullptr, "rejects a frame larger than a slot");
 

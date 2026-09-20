@@ -72,6 +72,12 @@ struct RingHeader {
     uint64_t pixels_capacity;  // usable pixel bytes per slot
     uint64_t icc_offset;       // from mapping start
     uint64_t icc_capacity;
+    // Where slot 0 begins, from mapping start. Page-aligned, and NOT
+    // sizeof(RingHeader): the header is padded up to a page so that every
+    // slot's pixel region lands on a page boundary in absolute terms. Metal
+    // rejects a linear texture over a 16-byte-misaligned address, and that is
+    // what deriving this from sizeof(RingHeader) produced.
+    uint64_t slots_offset;
     uint64_t total_size;
 
     // pack_latest(sequence, slot) of the newest published frame. 0 = nothing
@@ -135,6 +141,11 @@ public:
     // sequence. Returns false when there is nothing newer.
     bool acquire_latest(uint64_t* last_seen, FrameDesc* out_desc, const void** out_pixels);
     void release();
+
+    // Which slot the currently-held frame lives in. A consumer that builds one
+    // GPU texture per slot needs this to index its cache; digging it out of
+    // reader_claim works but makes an internal a public contract.
+    uint32_t held_slot() const { return latest_slot(held_); }
 
     // Copies the ICC blob out if `generation` differs from the caller's.
     // Returns the new generation, or 0 when unchanged or absent.

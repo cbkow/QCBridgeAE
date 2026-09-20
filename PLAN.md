@@ -62,6 +62,8 @@ so it loads into Premiere too. We take that: Premiere → QCView for free.
 
 **D7 — Route B first, Route A as the goal.** See below.
 
+**D8 — Shared memory rather than IOSurface.** See Transport, below.
+
 ## The tap: two routes
 
 | | **A — Mercury Transmit** | **B — AEGP + RenderSuite** |
@@ -94,21 +96,42 @@ Mercury Transmit hands over a CPU buffer, so nothing is GPU-resident to begin
 with. The goal is *one* write landing where the GPU can read it — not literally
 zero touches.
 
+**D8 — Page-aligned shared memory, not IOSurface.** *(Revised 2026-09-20 in
+A1; the original plan said IOSurface.)* `IOSurfaceCreateMachPort` /
+`LookupFromMachPort` are the easy half; the rendezvous is the hard one. Mach
+ports cannot travel over a Unix socket — `SCM_RIGHTS` carries file descriptors
+and an IOSurface has no fd form — and XPC needs a registered Mach service,
+meaning a LaunchAgent. A plugin living inside After Effects is in no position
+to register one. The alternatives were deprecated global surfaces addressed by
+guessable `IOSurfaceID`, or an install-time LaunchAgent dependency for what is
+meant to be a plugin.
+
+A page-aligned POSIX mapping is rendezvous-by-path, carries to Windows
+unchanged, and keeps the property that made IOSurface attractive.
+**Confirmed, not assumed**: `tests/metal_zerocopy_test.mm` builds a linear
+`MTLTexture` over the ring, mutates those pages from the CPU with no Metal call
+of any kind, and shows the GPU reading the new values. Apple M5 Max, macOS 27.
+
 | | Mechanism | Real cost |
 | --- | --- | --- |
-| macOS | IOSurface (`RGBA16Float`), CPU-written under lock, wrapped in QCView as `MTLTexture` via `makeTexture(descriptor:iosurface:plane:)`. Handoff by Mach port (`IOSurfaceCreateMachPort` / `LookupFromMachPort`). | **Zero transfer on Apple Silicon** — CPU writes the pages the GPU samples |
-| Windows | D3D11 shared texture, `DXGI_FORMAT_R16G16B16A16_FLOAT`, `SHARED_NTHANDLE \| SHARED_KEYEDMUTEX`; opened in QCView via `OpenSharedResource1`. | One PCIe upload on discrete GPUs. Unavoidable |
+| macOS | Page-aligned `shm_open` + `mmap`; consumer wraps a slot with `newBufferWithBytesNoCopy:` and `newTextureWithDescriptor:offset:bytesPerRow:`. | **Zero transfer on Apple Silicon** — measured: the GPU reads bare CPU writes |
+| Windows | Named file mapping; or a D3D11 shared texture (`DXGI_FORMAT_R16G16B16A16_FLOAT`, `SHARED_NTHANDLE \| SHARED_KEYEDMUTEX`) if a mapping can't back a texture without a staging copy. A5 decides. | One PCIe upload on discrete GPUs. Unavoidable |
 
-A **ring of 2–3 surfaces**, so AE writes N+1 while QCView samples N. Keyed mutex
-covers sync natively on Windows; on macOS a ready-signal over the control
-channel (or an `MTLSharedEvent`), since `IOSurfaceLock` alone won't coordinate a
-GPU reader.
+Rows are padded to `kRowAlignment` (256 B) because a linear texture has a
+device minimum for `bytes_per_row`. The producer owns that padding and reports
+it in the sidecar; a consumer computing `width * 8` instead will shear any
+frame whose width isn't a multiple of 32 pixels.
+
+A **ring of 3 slots**, so AE writes N+1 while QCView samples N. Sync is a
+seqlock per slot plus a reader claim the producer honours — no mutex, no
+ready-signal, and nothing for a crashed consumer to hold hostage. The Windows
+keyed-mutex option in A5 is an alternative to this, not an addition.
 
 ## Phases
 
 | Phase | Deliverable | Exit criteria |
 | --- | --- | --- |
-| **A1 Spine** | IOSurface ring + sidecar IPC + throwaway Metal viewer. No AE involved | Synthetic frames land in the viewer; surfaces recycle without tearing |
+| **A1 Spine** ✅ | Shared-memory ring + sidecar + throwaway Metal viewer. No AE involved | ~~Synthetic frames land in the viewer; surfaces recycle without tearing~~ **Done 2026-09-20** — `lab/results/2026-09-20-a1-ring-spine/`, `-a1b-metal-probe/` |
 | **A2 AEGP tap** | AEGP plugin: render active comp to a 32f world on idle, convert, publish. macOS | A live AE comp appears in the probe viewer, bit-exact for 8bpc |
 | **A3 QCView ingest** | Float inlet in QCView (new construction — everything there arrives via libavcodec today); OCIO Input driven by the sidecar ICC | Comp is live in QCView as a media item; OCIO engaged; A/B against an approved render works |
 | **A4 Transmit probe** | Premiere SDK; build its Transmit sample; log the `PrPixelFormat` list the host actually offers, under **both** AE and Premiere | Go / no-go on Route A, recorded in `lab/results/` |

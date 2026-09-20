@@ -47,6 +47,26 @@ enum FrameFlags : uint32_t {
     kFlagClampedOverflow = 1u << 1,  // at least one sample hit the 65504 ceiling
 };
 
+// GPU row-stride alignment. A linear texture over shared memory has a
+// per-device minimum for bytes_per_row: Metal exposes it as
+// minimumLinearTextureAlignmentForPixelFormat, D3D11 has an equivalent
+// constraint. 256 satisfies every device either API reports, and padding a
+// 4K RGBA16F row costs nothing (30720 is already a multiple of it).
+//
+// The producer owns this: it pads rows on the way in, and bytes_per_row says
+// what it did. A consumer that ignores the field and computes width * 8 will
+// shear every frame whose width isn't a multiple of 32 pixels.
+inline constexpr uint32_t kRowAlignment = 256u;
+
+inline constexpr uint32_t aligned_bytes_per_row(uint32_t width, uint32_t bytes_per_pixel) {
+    const uint32_t tight = width * bytes_per_pixel;
+    return (tight + kRowAlignment - 1u) / kRowAlignment * kRowAlignment;
+}
+
+inline constexpr uint32_t bytes_per_pixel(PixelFormat f) {
+    return f == PixelFormat::RGBA16F ? 8u : 0u;
+}
+
 struct FrameDesc {
     uint32_t width;
     uint32_t height;

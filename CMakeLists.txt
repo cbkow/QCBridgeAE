@@ -31,6 +31,18 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
+# qcbae-probe — synthetic producer + Metal viewer (phase A1b, macOS only).
+# Throwaway: `produce` is replaced by the AE plugin in A2, `view` by QCView in
+# A3. It exists so the transport can be watched before anything depends on it.
+# ---------------------------------------------------------------------------
+if(APPLE)
+    add_executable(qcbae-probe src/viewer-probe/probe_main.mm)
+    target_link_libraries(qcbae-probe PRIVATE qcbae_common
+        "-framework Cocoa" "-framework Metal" "-framework QuartzCore")
+    target_compile_options(qcbae-probe PRIVATE -fobjc-arc)
+endif()
+
+# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 include(CTest)
@@ -46,4 +58,15 @@ if(BUILD_TESTING)
     add_executable(ring_unit_test tests/ring_unit_test.cpp)
     target_link_libraries(ring_unit_test PRIVATE qcbae_common)
     add_test(NAME ring_unit COMMAND ring_unit_test)
+
+    # The zero-copy claim that justified shared memory over IOSurface. It is
+    # a test, not a note, because "the window looks right" cannot tell a
+    # shared mapping from a silent upload.
+    if(APPLE)
+        add_executable(metal_zerocopy_test tests/metal_zerocopy_test.mm)
+        target_link_libraries(metal_zerocopy_test PRIVATE qcbae_common
+            "-framework Metal" "-framework Foundation")
+        target_compile_options(metal_zerocopy_test PRIVATE -fobjc-arc)
+        add_test(NAME metal_zerocopy COMMAND metal_zerocopy_test)
+    endif()
 endif()
