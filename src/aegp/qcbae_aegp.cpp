@@ -55,6 +55,9 @@ uint32_t   S_ring_w = 0, S_ring_h = 0;
 uint64_t   S_published = 0;
 double     S_last_render = 0.0;
 uint64_t   S_icc_generation = 0;
+std::string S_icc_last;          // what we last published, to detect a real change
+double      S_icc_checked_at = 0.0;
+constexpr double kIccCheckSeconds = 1.0;
 
 // An idle hook that fails keeps being called, so a bug that raises a modal
 // error raises it forever and AE cannot be used. Learned the hard way: a stray
@@ -109,11 +112,21 @@ void publish_icc_profile(AEGP_CompH compH) {
         AEGP_MemSize size = 0;
         S_mem->AEGP_GetMemHandleSize(iccH, &size);
         if (S_mem->AEGP_LockMemHandle(iccH, &dataP) == A_Err_NONE && dataP != nullptr) {
-            if (S_ring.set_icc_profile(dataP, static_cast<uint32_t>(size))) {
-                ++S_icc_generation;
-                logf("published working-space ICC, %u bytes", static_cast<unsigned>(size));
-            } else {
-                logf("ICC rejected: %s", S_ring.error().c_str());
+            // Republish only on a real change. The working space follows
+            // Project Settings, so it changes when the user switches colour
+            // management system, config or working space mid-session — and a
+            // consumer that cached the old one would silently mislabel every
+            // frame after that. Generation is what tells it to re-read.
+            const std::string blob(static_cast<const char*>(dataP), size);
+            if (blob != S_icc_last) {
+                if (S_ring.set_icc_profile(blob.data(), static_cast<uint32_t>(blob.size()))) {
+                    S_icc_last = blob;
+                    ++S_icc_generation;
+                    logf("working-space ICC changed -> generation %llu, %u bytes",
+                         (unsigned long long)S_icc_generation, (unsigned)size);
+                } else {
+                    logf("ICC rejected: %s", S_ring.error().c_str());
+                }
             }
             S_mem->AEGP_UnlockMemHandle(iccH);
         }
@@ -243,14 +256,25 @@ A_Err render_and_publish() {
                     if (S_ring.create(kRingName, max_frame_bytes(uw, uh))) {
                         S_ring_w = uw; S_ring_h = uh;
                         S_icc_generation = 0;
+                        S_icc_last.clear();
+                        S_icc_checked_at = 0.0;   // force a profile publish below
                         logf("ring created for %ux%u", uw, uh);
-                        AEGP_CompH compH = nullptr;
-                        if (S_comp != nullptr
-                            && S_comp->AEGP_GetCompFromItem(itemH, &compH) == A_Err_NONE) {
-                            publish_icc_profile(compH);
-                        }
                     } else {
                         logf("ring create failed: %s", S_ring.error().c_str());
+                    }
+                }
+
+                // Re-check the working-space profile on an interval. Doing it
+                // per frame would serialise an ICC every tick for nothing;
+                // doing it only at ring creation misses every settings change,
+                // which is how a switch to OCIO left the sidecar describing the
+                // space the project no longer used.
+                if (S_ring.valid() && now_seconds() - S_icc_checked_at >= kIccCheckSeconds) {
+                    S_icc_checked_at = now_seconds();
+                    AEGP_CompH compH = nullptr;
+                    if (S_comp != nullptr
+                        && S_comp->AEGP_GetCompFromItem(itemH, &compH) == A_Err_NONE) {
+                        publish_icc_profile(compH);
                     }
                 }
 

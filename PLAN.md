@@ -93,14 +93,31 @@ and that the scale fixes it.
 AE scene-linear specular hits legitimately go there; `inf` does ugly things
 downstream in OCIO.
 
-**D5 — The sidecar carries meaning; the surface carries only numbers.**
-Preserving values while mislabeling them is still a broken picture. Per frame:
-surface index, dimensions, source tier, premultiplied-alpha flag, comp name,
-frame time, and the **working-space ICC profile**. AE hands us the real one —
-`AEGP_ColorSettingsSuite6` → `AEGP_GetNewWorkingSpaceColorProfile` →
-`AEGP_GetNewICCProfileFromColorProfile` (v6 also exposes graphics white and the
-color-space-aware flag; frozen in AE 25.1). QCView's OCIO Input node is driven
-by that, never guessed.
+**D5 — The sidecar carries container facts, not colour semantics.**
+*(Revised 2026-09-20 after measuring; the original had it driving QCView's OCIO
+input node.)*
+
+Per frame: surface index, dimensions, source tier, `channel_order`,
+`value_scale`, premultiplied-alpha flag, comp name, frame time. These are
+**mechanical** — how the bytes are laid out — always true, exactly reversible,
+and an image is visibly broken without them.
+
+Colour *meaning* is QCView's to decide, explicitly, in its OCIO panel. Two
+reasons. First, deriving an input transform from an ICC profile re-imports the
+ICC-round-trip pitfalls this project exists to escape, and does so invisibly: a
+mislabelled image doesn't look broken, it looks like a different grade.
+Second, it demonstrably would not work — under OCIO colour management
+`AEGP_GetNewWorkingSpaceColorProfile` reports "Rec.709 Gamma 2.4" for an
+ACEScg project (`lab/results/2026-09-20-a2b-ocio-and-range/`).
+
+The working-space ICC is still published — it costs 624 bytes, refreshes on
+change, and is correct under Adobe colour management — but as an **optional
+hint that must never be presented as authoritative**. Under OCIO it does not
+track the working space, so it is not dependable for drift detection either.
+
+Imported media is AE's own business: Interpret Footage converts on import, and
+**Preserve RGB** is the escape hatch when it shouldn't. A manual step, kept
+with the person who knows what the footage is.
 
 **D6 — Premiere support is a feature, not a side effect.** A Transmit plugin
 lives in the shared `/Library/Application Support/Adobe/Common/Plug-ins/7.0/

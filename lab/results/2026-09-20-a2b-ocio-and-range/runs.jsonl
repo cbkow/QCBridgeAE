@@ -1,0 +1,6 @@
+{"run":"overrange","bpc":32,"exposure_stops":2,"linear_multiplier":4,"received":1.78125,"note":"Exposure applies its own linear-light conversion at workingGamma 2.4"}
+{"run":"overrange","bpc":32,"exposure_stops":6,"linear_multiplier":64,"received":5.65625}
+{"run":"overrange","bpc":32,"exposure_stops":20,"linear_multiplier":1048576,"received":322.5}
+{"run":"overrange","bpc":32,"exposure_stops":3,"linear_multiplier":8,"received":8.0,"bypass_linear_light":true,"result":"exact; unclamped; confound isolated"}
+{"run":"ocio-working-space","cms":"OCIO","config":"ACES 2.0 Studio v4.0","project_working_space":"ACEScg","icc_reports":"Rec.709 Gamma 2.4","result":"MISMATCH — AEGP colour API does not track the OCIO working space"}
+{"run":"imported-media","source":"tagged sRGB pure red PNG","project_working_space":"ACEScg","received":[1.45117,0.0,0.00832],"expected_if_acescg":[0.613,0.070,0.021],"note":"AE Interpret Footage conversion; use Preserve RGB to skip it"}

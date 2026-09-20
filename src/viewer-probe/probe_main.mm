@@ -160,6 +160,51 @@ int run_producer(uint32_t w, uint32_t h, double fps, SourceTier tier) {
 // because a window shows the display pipeline's opinion of the pixels. This
 // prints the bytes, which is what "bit-exact" has to mean.
 // ---------------------------------------------------------------------------
+// Minimal ICC reader: enough to name the profile, which is the whole job the
+// sidecar profile has under PLAN.md D5 — tell the user what AE says the
+// working space is, so a mismatch with their OCIO input choice is visible.
+// Deliberately not a colour engine.
+std::string icc_description(const std::string& icc) {
+    auto be32 = [&](size_t o) -> uint32_t {
+        if (o + 4 > icc.size()) return 0;
+        const auto* b = reinterpret_cast<const uint8_t*>(icc.data()) + o;
+        return (uint32_t(b[0]) << 24) | (uint32_t(b[1]) << 16) | (uint32_t(b[2]) << 8) | b[3];
+    };
+    if (icc.size() < 132) return {};
+    const uint32_t count = be32(128);
+    if (count > 256) return {};
+    for (uint32_t i = 0; i < count; ++i) {
+        const size_t e = 132 + i * 12;
+        if (e + 12 > icc.size()) break;
+        if (icc.compare(e, 4, "desc") != 0) continue;
+        const uint32_t off = be32(e + 4), len = be32(e + 8);
+        if (off + len > icc.size() || len < 12) return {};
+        if (icc.compare(off, 4, "desc") == 0) {          // ICC v2 textDescription
+            const uint32_t n = be32(off + 8);
+            if (n == 0 || off + 12 + n > icc.size()) return {};
+            std::string s = icc.substr(off + 12, n);
+            while (!s.empty() && s.back() == '\0') s.pop_back();
+            return s;
+        }
+        if (icc.compare(off, 4, "mluc") == 0) {          // ICC v4 multiLocalizedUnicode
+            const uint32_t recs = be32(off + 8);
+            if (recs == 0) return {};
+            const uint32_t slen = be32(off + 20), soff = be32(off + 24);
+            if (off + soff + slen > icc.size()) return {};
+            std::string s;                                // UTF-16BE -> ASCII subset
+            for (uint32_t k = 0; k + 1 < slen; k += 2) {
+                const auto hi = static_cast<uint8_t>(icc[off + soff + k]);
+                const auto lo = static_cast<uint8_t>(icc[off + soff + k + 1]);
+                const uint16_t c = static_cast<uint16_t>((hi << 8) | lo);
+                if (c == 0) break;
+                s.push_back(c < 128 ? static_cast<char>(c) : '?');
+            }
+            return s;
+        }
+    }
+    return {};
+}
+
 int run_dump(int argc, const char** argv) {
     SharedRing ring;
     if (!ring.open(kRingName)) {
@@ -190,9 +235,12 @@ int run_dump(int argc, const char** argv) {
 
     std::string icc;
     const uint64_t gen = ring.read_icc_profile(0, &icc);
-    std::printf("working-space ICC: %zu bytes (generation %llu)%s\n",
+    const std::string desc = icc_description(icc);
+    std::printf("working space: \"%s\"\n", desc.empty() ? "(no description)" : desc.c_str());
+    std::printf("  ICC %zu bytes, generation %llu, data space '%s', sidecar generation %llu\n",
                 icc.size(), (unsigned long long)gen,
-                icc.size() >= 84 ? ("  desc='" + std::string(icc.substr(16, 4)) + "'").c_str() : "");
+                icc.size() >= 20 ? icc.substr(16, 4).c_str() : "?",
+                (unsigned long long)d.icc_generation);
 
     // Sample points given as x,y pairs on the command line.
     std::printf("\nsamples (as stored, AE channel order):\n");
