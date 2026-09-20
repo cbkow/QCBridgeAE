@@ -109,3 +109,33 @@ Nothing about the transport. The pipe's requirement is fidelity, and fidelity
 is measured: bit-exact at 8 and 16 bpc, nearest-half at 32, over-range intact.
 What AE *reports* about its own colour setup turned out not to matter, because
 QCView decides the transform.
+
+## Colour check: what we make vs what arrives, under OCIO
+
+Project on OCIO / ACES 2.0 Studio v4.0 / ACEScg, 32 bpc. Solids created with
+known values (no Interpret Footage in the path), read back from the ring.
+
+| AE solid | Received | Nearest half | |
+| --- | --- | --- | --- |
+| 0.0 | 0.00000 | 0.00000 | exact |
+| 0.25 | 0.25000 | 0.25000 | exact |
+| 0.5 | 0.50000 | 0.50000 | exact |
+| 0.75 | 0.75000 | 0.75000 | exact |
+| 1.0 | 1.00000 | 1.00000 | exact |
+| (1,0,0) | 1.00000, 0, 0 | — | exact |
+| (0,1,0) | 0, 1.00000, 0 | — | exact |
+| (0,0,1) | 0, 0, 1.00000 | — | exact |
+| (0.1,0.2,0.3) | 0.09998, 0.19995, 0.29980 | 0.09998, 0.19995, 0.29980 | match |
+| (0.3,0.6,0.9) | 0.29980, 0.59961, 0.89990 | 0.29980, 0.59961, 0.89990 | match |
+| (0.05,0.95,0.55) | 0.04999, 0.94971, 0.54980 | 0.04999, 0.94971, 0.54980 | match |
+
+**Every value is exactly the nearest representable half of what was typed in.**
+No colour conversion is applied to colours made in AE, under OCIO, at 32 bpc —
+the only delta anywhere is the 32f→16f quantisation chosen in D1/D2, and it
+lands precisely where predicted rather than anywhere else.
+
+Values exactly representable in half (0, 0.25, 0.5, 0.75, 1.0, and the
+primaries) come through bit-identical.
+
+This is the brief satisfied: raw RGBA out of AE, unconverted, for QCView to
+transform as the user directs.

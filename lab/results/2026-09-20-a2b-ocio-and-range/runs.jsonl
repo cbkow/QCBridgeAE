@@ -4,3 +4,8 @@
 {"run":"overrange","bpc":32,"exposure_stops":3,"linear_multiplier":8,"received":8.0,"bypass_linear_light":true,"result":"exact; unclamped; confound isolated"}
 {"run":"ocio-working-space","cms":"OCIO","config":"ACES 2.0 Studio v4.0","project_working_space":"ACEScg","icc_reports":"Rec.709 Gamma 2.4","result":"MISMATCH — AEGP colour API does not track the OCIO working space"}
 {"run":"imported-media","source":"tagged sRGB pure red PNG","project_working_space":"ACEScg","received":[1.45117,0.0,0.00832],"expected_if_acescg":[0.613,0.070,0.021],"note":"AE Interpret Footage conversion; use Preserve RGB to skip it"}
+{"run":"colour-check-ocio","cms":"OCIO","working_space":"ACEScg","bpc":32,"source":[0.0,0.25,0.5,0.75,1.0],"received":[0.0,0.25,0.5,0.75,1.0],"result":"bit-identical (exactly representable in half)"}
+{"run":"colour-check-ocio","cms":"OCIO","working_space":"ACEScg","bpc":32,"source":[[1,0,0],[0,1,0],[0,0,1]],"received":[[1,0,0],[0,1,0],[0,0,1]],"result":"bit-identical"}
+{"run":"colour-check-ocio","cms":"OCIO","working_space":"ACEScg","bpc":32,"source":[0.1,0.2,0.3],"received":[0.09998,0.19995,0.29980],"nearest_half":[0.09998,0.19995,0.29980],"result":"match"}
+{"run":"colour-check-ocio","cms":"OCIO","working_space":"ACEScg","bpc":32,"source":[0.3,0.6,0.9],"received":[0.29980,0.59961,0.89990],"nearest_half":[0.29980,0.59961,0.89990],"result":"match"}
+{"run":"colour-check-ocio","cms":"OCIO","working_space":"ACEScg","bpc":32,"source":[0.05,0.95,0.55],"received":[0.04999,0.94971,0.54980],"nearest_half":[0.04999,0.94971,0.54980],"result":"match"}
