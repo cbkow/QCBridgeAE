@@ -23,24 +23,52 @@ Everything upstream is different:
 
 ## Decisions
 
-**D1 — One wire format: `RGBA16F`, every AE tier.** Half matches none of AE's
-three tiers exactly, but QCView's HDR paths top out at 16F, so nothing survives
-past the boundary regardless; and same-machine means the 8bpc "waste" is memory
-bandwidth, which is free at these rates. Matching tiers would buy three texture
-formats and three shader paths in exchange for precision the pipeline discards.
+**D1 — Native wire format per AE tier; only the float tier converts.**
+*(Revised 2026-09-20 after measuring. The original decision was RGBA16F for
+everything.)*
+
+| AE tier | Wire | Why |
+| --- | --- | --- |
+| 8 bpc | `RGBA8Unorm` | memcpy, exact, **half the wire bytes** (31.6 vs 63.3 MB at 4K) |
+| 16 bpc | `RGBA16Unorm` | memcpy, and keeps all 15 bits instead of ~11 |
+| 32 bpc | `RGBA16F` | converted; QCView has no 32f flow (D2) |
+
+Measured at 4K (`tests/convert_bench.cpp`, `lab/results/2026-09-20-a1c-wire-format/`):
+converting the integer tiers to half costs **4.4× for 8 bpc** (0.66 → 2.90 ms)
+and **1.2× for 16 bpc** (1.31 → 1.60 ms) against carrying them natively — and
+8 bpc is already exact in half, so that cost buys literally nothing.
+
+The original argument said matching tiers would buy "three texture formats and
+three shader paths". The first half was true and irrelevant; the second half
+was wrong. All three sample identically through one `texture2d<float>` binding,
+because the texture unit normalizes integer formats in hardware — verified in
+`tests/texture_format_test.mm`. Per-tier costs a `pixelFormat` switch and one
+uniform, not a code path.
+
+**The 32 bpc path needs hardware half conversion**, not a portable fallback:
+12.55 ms scalar vs 2.67 ms with NEON `vcvt_f16_f32` at 4K (~80 vs ~374 fps).
+The x86 equivalent is F16C `_mm256_cvtps_ph`, available since 2012. The integer
+tiers sidestep the question entirely by never converting.
 
 **D2 — Accepted precision losses, written down on purpose.**
 - 32f → 16f: 24-bit significand to 11-bit. Accepted (chris, 2026-09-20) —
-  QCView has no 32F flow today.
-- 16bpc → 16f: AE's 16-bit is `0..32768` (`PF_MAX_CHAN16`), ~15 bits uniform.
-  Half's spacing crosses AE's at ~0.031: finer below, **up to 16× coarser just
-  under white** (1/2048 vs 1/32768). Shows on near-white gradients after an
-  OCIO exposure lift. Not fixable without a 16-unorm path end-to-end in QCView.
-- 8bpc → 16f: exact.
+  QCView has no 32F flow today. **This is the only remaining conversion loss.**
+- 16bpc: ~~up to 16× coarser just under white~~ **no longer lost on the wire**
+  (D1 revision) — `RGBA16Unorm` carries all 15 bits. Whether they survive
+  *inside* QCView depends on where it quantizes to 16F: if OCIO runs in the
+  same pass as the sample, fp32 registers carry them and only the output
+  quantizes; if it writes a 16F intermediate first, they die there. **Open,
+  A3.** The speed and byte-count wins hold either way.
+- 8bpc: exact, and now exact without touching a pixel.
 
-**D3 — Normalize 16bpc by 32768, not 65535.** Applied at conversion, before the
-half cast. Getting this wrong makes everything half-bright — a silent
-transformation, exactly the class of bug this project exists to prevent.
+**D3 — Normalize 16bpc by 32768, not 65535.** With D1's revision this moves to
+the consumer: `RGBA16Unorm` hands the GPU AE's 0..32768 inside a 0..65535
+container, so hardware normalization lands on ~0.5 and the image is
+half-bright. `FrameDesc::value_scale` carries the correction (65535/32768,
+exact in fp32) and a consumer applies it **unconditionally** rather than
+keeping a table of per-format special cases. Pinned by
+`tests/texture_format_test.mm`, which asserts both that the raw sample is wrong
+and that the scale fixes it.
 
 **D4 — Clamp at 65504 on the 32f path.** Half overflows to `inf` above that and
 AE scene-linear specular hits legitimately go there; `inf` does ugly things

@@ -22,12 +22,20 @@ inline constexpr uint32_t kFrameDescVersion = 1u;
 
 inline constexpr uint32_t kMaxCompName = 128u;
 
-// What the surface holds. One value today (PLAN.md D1: RGBA16F for every AE
-// tier); the field exists so a future format is a version bump, not a
-// reinterpretation of old data.
+// What the surface holds. One per AE tier (PLAN.md D1): the integer tiers
+// travel native and the GPU's texture unit normalizes them for free, because
+// converting them to half costs 4.5x (8bpc) and 1.2x (16bpc) for precision
+// that is either already exact or actively worse. Only the float tier is
+// converted, and only because QCView has no 32f flow (D2).
+//
+// All three sample as `texture2d<float>` through one shader and one pipeline —
+// verified in tests/texture_format_test.mm, because that equivalence is what
+// makes per-tier formats cost a switch rather than a code path.
 enum class PixelFormat : uint32_t {
-    Unknown   = 0,
-    RGBA16F   = 1,
+    Unknown     = 0,
+    RGBA16F     = 1,   // AE 32 bpc, converted. MTLPixelFormatRGBA16Float
+    RGBA8Unorm  = 2,   // AE 8 bpc,  native.    MTLPixelFormatRGBA8Unorm
+    RGBA16Unorm = 3,   // AE 16 bpc, native.    MTLPixelFormatRGBA16Unorm
 };
 
 // Which AE tier the pixels came FROM, before conversion to the wire format.
@@ -64,7 +72,28 @@ inline constexpr uint32_t aligned_bytes_per_row(uint32_t width, uint32_t bytes_p
 }
 
 inline constexpr uint32_t bytes_per_pixel(PixelFormat f) {
-    return f == PixelFormat::RGBA16F ? 8u : 0u;
+    switch (f) {
+        case PixelFormat::RGBA8Unorm:  return 4u;
+        case PixelFormat::RGBA16F:
+        case PixelFormat::RGBA16Unorm: return 8u;
+        default:                       return 0u;
+    }
+}
+
+// The wire format for a given AE tier. Integer tiers stay as they are.
+inline constexpr PixelFormat wire_format_for(SourceTier t) {
+    switch (t) {
+        case SourceTier::Int8:    return PixelFormat::RGBA8Unorm;
+        case SourceTier::Int16:   return PixelFormat::RGBA16Unorm;
+        case SourceTier::Float32: return PixelFormat::RGBA16F;
+        default:                  return PixelFormat::Unknown;
+    }
+}
+
+// Worst case across every tier, for sizing a ring slot that must survive the
+// user changing project bit depth mid-session without a rebuild.
+inline constexpr uint64_t max_frame_bytes(uint32_t width, uint32_t height) {
+    return static_cast<uint64_t>(aligned_bytes_per_row(width, 8u)) * height;
 }
 
 struct FrameDesc {
@@ -86,7 +115,20 @@ struct FrameDesc {
     // generation counter tells the consumer when its cached copy is stale.
     uint64_t icc_generation;
     float    graphics_white;   // nits; 0 = unspecified
-    uint32_t _pad0;
+
+    // Multiply what the GPU samples by this to recover the intended value.
+    //
+    // It exists because AE's 16 bpc white is 32768, not 65535: carried in an
+    // RGBA16Unorm texture, hardware normalization lands on 0.50001 and the
+    // image is half-bright — a silent transformation, the exact class of bug
+    // this project exists to prevent (PLAN.md D3). 65535/32768 corrects it and
+    // is exact in fp32.
+    //
+    // Carried per frame rather than inferred from the format, so the producer
+    // states what it did instead of the consumer keeping a table of special
+    // cases. 1.0 for every other tier. A consumer must apply it unconditionally
+    // and must not special-case the format.
+    float    value_scale;
 
     // Display label for the QCView media item. In memory only — never logged
     // (PLAN.md §Privacy 5).
@@ -94,5 +136,8 @@ struct FrameDesc {
 };
 
 static_assert(sizeof(FrameDesc) == 184, "FrameDesc is a wire format — size change needs a version bump");
+
+// AE 16 bpc: PF_MAX_CHAN16 is 32768, the unorm container is 65535.
+inline constexpr float kAE16ValueScale = 65535.0f / 32768.0f;
 
 }  // namespace qcbae

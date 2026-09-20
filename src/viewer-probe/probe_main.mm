@@ -56,18 +56,23 @@ uint16_t to_half(float f) {
 // ---------------------------------------------------------------------------
 // produce
 // ---------------------------------------------------------------------------
-int run_producer(uint32_t w, uint32_t h, double fps) {
-    const uint32_t bpp = bytes_per_pixel(PixelFormat::RGBA16F);
+int run_producer(uint32_t w, uint32_t h, double fps, SourceTier tier) {
+    const PixelFormat fmt = wire_format_for(tier);
+    const uint32_t bpp = bytes_per_pixel(fmt);
     const uint32_t bpr = aligned_bytes_per_row(w, bpp);
     const uint64_t frame_bytes = static_cast<uint64_t>(bpr) * h;
 
     SharedRing ring;
-    if (!ring.create(kRingName, frame_bytes)) {
+    // Sized for the worst tier so a format change needs no rebuild.
+    if (!ring.create(kRingName, max_frame_bytes(w, h))) {
         std::fprintf(stderr, "producer: %s\n", ring.error().c_str());
         return 1;
     }
-    std::printf("producing %ux%u RGBA16F at %.1f fps into %s (ctrl-C to stop)\n",
-                w, h, fps, kRingName);
+    const char* fmt_name = fmt == PixelFormat::RGBA8Unorm  ? "RGBA8Unorm (AE 8bpc, native)"
+                         : fmt == PixelFormat::RGBA16Unorm ? "RGBA16Unorm (AE 16bpc, native)"
+                                                           : "RGBA16F (AE 32bpc, converted)";
+    std::printf("producing %ux%u %s at %.1f fps into %s (ctrl-C to stop)\n",
+                w, h, fmt_name, fps, kRingName);
 
     // A stand-in ICC blob so the consumer's profile path is exercised before
     // A2 supplies a real one from AEGP_ColorSettingsSuite6.
@@ -79,7 +84,7 @@ int run_producer(uint32_t w, uint32_t h, double fps) {
     uint64_t frame = 0;
 
     while (true) {
-        auto* px = static_cast<uint16_t*>(ring.begin_write(frame_bytes));
+        auto* px = static_cast<uint8_t*>(ring.begin_write(frame_bytes));
         if (px == nullptr) { std::fprintf(stderr, "begin_write: %s\n", ring.error().c_str()); return 1; }
 
         // Flat background, new colour every frame — a seam means a tear.
@@ -90,26 +95,49 @@ int run_producer(uint32_t w, uint32_t h, double fps) {
         const uint32_t bar = static_cast<uint32_t>(frame * 7u) % w;
 
         for (uint32_t y = 0; y < h; ++y) {
-            auto* row = reinterpret_cast<uint16_t*>(reinterpret_cast<uint8_t*>(px) + y * bpr);
+            uint8_t* row = px + y * bpr;
             // Vertical ramp that runs past 1.0, so clipping is visible and the
-            // HDR path has something above diffuse white to carry.
+            // float path has something above diffuse white to carry. The
+            // integer tiers clip at 1.0 by definition — which is itself worth
+            // seeing side by side.
             const float lift = 2.5f * static_cast<float>(y) / static_cast<float>(h);
             for (uint32_t x = 0; x < w; ++x) {
                 const bool on_bar = (x >= bar && x < bar + 24u);
-                const float r = on_bar ? 3.0f : br * (0.4f + lift);
-                const float g = on_bar ? 3.0f : bg * (0.4f + lift);
-                const float b = on_bar ? 3.0f : bb * (0.4f + lift);
-                row[x * 4 + 0] = to_half(r);
-                row[x * 4 + 1] = to_half(g);
-                row[x * 4 + 2] = to_half(b);
-                row[x * 4 + 3] = to_half(1.0f);
+                const float v[4] = {
+                    on_bar ? 3.0f : br * (0.4f + lift),
+                    on_bar ? 3.0f : bg * (0.4f + lift),
+                    on_bar ? 3.0f : bb * (0.4f + lift),
+                    1.0f,
+                };
+                switch (fmt) {
+                    case PixelFormat::RGBA8Unorm: {
+                        uint8_t* o = row + x * 4;
+                        for (int c = 0; c < 4; ++c)
+                            o[c] = static_cast<uint8_t>((v[c] < 0 ? 0 : v[c] > 1 ? 1 : v[c]) * 255.0f + 0.5f);
+                        break;
+                    }
+                    case PixelFormat::RGBA16Unorm: {
+                        // AE's native 0..32768. The container is 0..65535, so
+                        // the consumer's value_scale puts it back.
+                        auto* o = reinterpret_cast<uint16_t*>(row) + x * 4;
+                        for (int c = 0; c < 4; ++c)
+                            o[c] = static_cast<uint16_t>((v[c] < 0 ? 0 : v[c] > 1 ? 1 : v[c]) * 32768.0f + 0.5f);
+                        break;
+                    }
+                    default: {
+                        auto* o = reinterpret_cast<uint16_t*>(row) + x * 4;
+                        for (int c = 0; c < 4; ++c) o[c] = to_half(v[c]);
+                        break;
+                    }
+                }
             }
         }
 
         FrameDesc d{};
         d.width = w; d.height = h; d.bytes_per_row = bpr;
-        d.pixel_format = PixelFormat::RGBA16F;
-        d.source_tier  = SourceTier::Float32;
+        d.pixel_format = fmt;
+        d.source_tier  = tier;
+        d.value_scale  = (tier == SourceTier::Int16) ? kAE16ValueScale : 1.0f;
         d.flags        = kFlagPremultiplied;
         d.time_value   = static_cast<int64_t>(frame);
         d.time_scale   = 24;
@@ -143,10 +171,13 @@ vertex VSOut v_main(uint vid [[vertex_id]]) {
 }
 
 fragment float4 f_main(VSOut in [[stage_in]],
-                       texture2d<float> tex [[texture(0)]]) {
+                       texture2d<float> tex [[texture(0)]],
+                       constant float& value_scale [[buffer(0)]]) {
     constexpr sampler s(filter::nearest, address::clamp_to_edge);
-    // Deliberately no transform. See the file header.
-    return tex.sample(s, in.uv);
+    // value_scale is a container correction, not a look: AE 16bpc white is
+    // 32768 in a 0..65535 unorm. Applied unconditionally, never per-format.
+    // Beyond it, deliberately no transform. See the file header.
+    return tex.sample(s, in.uv) * float4(value_scale, value_scale, value_scale, 1.0);
 }
 )";
 
@@ -165,6 +196,7 @@ fragment float4 f_main(VSOut in [[stage_in]],
     SharedRing                   _ring;
     std::vector<id<MTLTexture>>  _textures;   // one per slot, built once
     std::vector<id<MTLBuffer>>   _buffers;
+    std::vector<PixelFormat>     _slotFormats;
     uint64_t                     _lastSeen;
     uint64_t                     _framesShown;
     uint64_t                     _lastSeq;
@@ -220,6 +252,7 @@ fragment float4 f_main(VSOut in [[stage_in]],
     for (uint32_t i = 0; i < h->slot_count; ++i) {
         _buffers.push_back(nil);
         _textures.push_back(nil);
+        _slotFormats.push_back(PixelFormat::Unknown);
     }
     std::printf("ring open: %u slots, %llu KiB each\n",
                 h->slot_count, (unsigned long long)(h->pixels_capacity / 1024));
@@ -227,9 +260,20 @@ fragment float4 f_main(VSOut in [[stage_in]],
 }
 
 - (id<MTLTexture>)textureForSlot:(uint32_t)slot pixels:(const void*)pixels desc:(const FrameDesc&)d {
-    if (slot < _textures.size() && _textures[slot] != nil) {
+    // Cache is keyed on geometry AND format: the user changing project bit
+    // depth mid-session changes the format under a slot that is otherwise the
+    // same size, and reusing the texture would reinterpret the bytes.
+    if (slot < _textures.size() && _textures[slot] != nil
+        && _slotFormats[slot] == d.pixel_format) {
         id<MTLTexture> t = _textures[slot];
         if (t.width == d.width && t.height == d.height) return t;
+    }
+    MTLPixelFormat mpf;
+    switch (d.pixel_format) {
+        case PixelFormat::RGBA8Unorm:  mpf = MTLPixelFormatRGBA8Unorm;  break;
+        case PixelFormat::RGBA16Unorm: mpf = MTLPixelFormatRGBA16Unorm; break;
+        case PixelFormat::RGBA16F:     mpf = MTLPixelFormatRGBA16Float; break;
+        default: return nil;
     }
     id<MTLBuffer> buf = [_device newBufferWithBytesNoCopy:const_cast<void*>(pixels)
                                                    length:_ring.header()->pixels_capacity
@@ -237,12 +281,14 @@ fragment float4 f_main(VSOut in [[stage_in]],
                                               deallocator:nil];
     if (buf == nil) return nil;
     MTLTextureDescriptor* td =
-        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mpf
                                                            width:d.width height:d.height mipmapped:NO];
     td.usage = MTLTextureUsageShaderRead;
     td.storageMode = MTLStorageModeShared;
     id<MTLTexture> tex = [buf newTextureWithDescriptor:td offset:0 bytesPerRow:d.bytes_per_row];
-    if (slot < _textures.size()) { _buffers[slot] = buf; _textures[slot] = tex; }
+    if (slot < _textures.size()) {
+        _buffers[slot] = buf; _textures[slot] = tex; _slotFormats[slot] = d.pixel_format;
+    }
     return tex;
 }
 
@@ -270,6 +316,8 @@ fragment float4 f_main(VSOut in [[stage_in]],
         id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rp];
         [enc setRenderPipelineState:_pipeline];
         [enc setFragmentTexture:tex atIndex:0];
+        float scale = d.value_scale > 0.0f ? d.value_scale : 1.0f;
+        [enc setFragmentBytes:&scale length:sizeof(scale) atIndex:0];
         [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [enc endEncoding];
         [cb presentDrawable:drawable];
@@ -288,8 +336,9 @@ fragment float4 f_main(VSOut in [[stage_in]],
         NSString* s = [NSString stringWithFormat:
             @"%ux%u  %s  seq %llu  shown %llu  skipped(last) %llu  %.1f fps  \"%s\"",
             d.width, d.height,
-            d.source_tier == SourceTier::Float32 ? "32f->16f"
-              : d.source_tier == SourceTier::Int16 ? "16i->16f" : "8i->16f",
+            d.pixel_format == PixelFormat::RGBA8Unorm  ? "8i native"
+              : d.pixel_format == PixelFormat::RGBA16Unorm ? "16i native"
+              : "32f->16f",
             (unsigned long long)_lastSeen, (unsigned long long)_framesShown,
             (unsigned long long)skipped, _framesShown / since, d.comp_name];
         _hud.stringValue = s;
@@ -331,13 +380,17 @@ int main(int argc, const char** argv) {
     const std::string mode = argc > 1 ? argv[1] : "";
     if (mode == "produce") {
         uint32_t w = 1280, h = 720; double fps = 24.0;
+        SourceTier tier = SourceTier::Float32;
         for (int i = 2; i + 1 < argc; i += 2) {
-            const std::string k = argv[i];
-            if (k == "--width")  w = static_cast<uint32_t>(std::atoi(argv[i + 1]));
-            if (k == "--height") h = static_cast<uint32_t>(std::atoi(argv[i + 1]));
-            if (k == "--fps")    fps = std::atof(argv[i + 1]);
+            const std::string k = argv[i], v = argv[i + 1];
+            if (k == "--width")  w = static_cast<uint32_t>(std::atoi(v.c_str()));
+            if (k == "--height") h = static_cast<uint32_t>(std::atoi(v.c_str()));
+            if (k == "--fps")    fps = std::atof(v.c_str());
+            if (k == "--tier")   tier = v == "8"  ? SourceTier::Int8
+                                      : v == "16" ? SourceTier::Int16
+                                                  : SourceTier::Float32;
         }
-        return run_producer(w, h, fps);
+        return run_producer(w, h, fps, tier);
     }
     if (mode == "view") {
         @autoreleasepool {

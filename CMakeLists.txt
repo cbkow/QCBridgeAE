@@ -45,6 +45,11 @@ endif()
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+# Measurement, not assertion: the numbers behind D1. Run by hand; the Windows
+# machine should re-run it, since the ratios may differ off unified memory.
+add_executable(qcbae-convbench tests/convert_bench.cpp)
+target_link_libraries(qcbae-convbench PRIVATE qcbae_common)
+
 include(CTest)
 if(BUILD_TESTING)
     # Cross-process, so it needs fork(); the Windows port arrives with A5.
@@ -68,5 +73,12 @@ if(BUILD_TESTING)
             "-framework Metal" "-framework Foundation")
         target_compile_options(metal_zerocopy_test PRIVATE -fobjc-arc)
         add_test(NAME metal_zerocopy COMMAND metal_zerocopy_test)
+
+        # D1's premise: one shader samples every per-tier wire format.
+        add_executable(texture_format_test tests/texture_format_test.mm)
+        target_link_libraries(texture_format_test PRIVATE qcbae_common
+            "-framework Metal" "-framework Foundation")
+        target_compile_options(texture_format_test PRIVATE -fobjc-arc)
+        add_test(NAME texture_format COMMAND texture_format_test)
     endif()
 endif()

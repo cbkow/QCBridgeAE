@@ -1,0 +1,8 @@
+{"run":"convert-4k","tier":"8bpc","target":"RGBA8Unorm","mode":"native memcpy","ms":0.66,"fps":1523.9,"gb_per_s":101.1}
+{"run":"convert-4k","tier":"8bpc","target":"RGBA16F","mode":"hardware half (__fp16)","ms":2.90,"fps":344.4,"penalty_vs_native":4.4}
+{"run":"convert-4k","tier":"16bpc","target":"RGBA16Unorm","mode":"native memcpy","ms":1.31,"fps":766.2,"gb_per_s":101.7}
+{"run":"convert-4k","tier":"16bpc","target":"RGBA16F","mode":"hardware half (__fp16)","ms":1.60,"fps":625.2,"penalty_vs_native":1.2}
+{"run":"convert-4k","tier":"32bpc","target":"RGBA16F","mode":"portable scalar","ms":12.55,"fps":79.7}
+{"run":"convert-4k","tier":"32bpc","target":"RGBA16F","mode":"NEON vcvt_f16_f32","ms":2.67,"fps":374.4,"speedup_vs_portable":4.7}
+{"run":"texture-format","device":"Apple M5 Max","checks":9,"pass":9,"fail":0,"result":"one texture2d<float> pipeline samples RGBA8Unorm, RGBA16Unorm and RGBA16Float identically; value_scale recovers AE white to 1.000000"}
+{"run":"probe-tier-parity","metric":"sampled luma at three heights","rgba8":[84,122,159],"rgba16unorm":[84,123,160],"rgba16f":[84,123,160],"note":"within 1 LSB; without value_scale the 16bpc row would read ~half"}
