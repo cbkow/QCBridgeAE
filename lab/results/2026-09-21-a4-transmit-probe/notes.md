@@ -189,6 +189,52 @@ R15b also repeats the format finding at a fourth combination: offered
 32f whatever the project depth and whatever the order; the only way observed
 so far to get an integer tier is to offer it alone.
 
+## 9. OCIO/ACES re-check, fixed build
+
+ACES 2.0 Studio config, ACEScg working space, 16 bpc. Offered all six with
+working space (R20), argb32f unset (R21), argb32f sRGB by name (R22): all
+**untouched**, all identical. Under OCIO the request is ignored in both
+configs tried; under Adobe CMS it is honoured (sections 7, 8).
+
+## 10. What the host's tier choice costs — measured
+
+Scratch project, **8 bpc**, OCIO/ACEScg. Comp 3840×2160, 24 fps, 10 s, one
+solid moving across a background so every frame differs. Viewer locked to
+Full resolution. AE's preview playback, looping, frames from AE's cache
+(host render time 0 ms throughout). Each condition offers **one** format, so
+the host must deliver it. AE CPU is cumulative CPU-seconds over a fixed 12 s
+window of steady playback (`ps cputime`), divided by 12.
+
+A first attempt was discarded: the viewer was on Auto resolution, so some
+"4K" runs pushed smaller frames (one 32f run's copy time implied >300 GB/s),
+and top's instantaneous CPU sampling swung 52–79% for identical conditions.
+
+| Delivered | AE CPU, pass 1 / pass 2 (cores) | Cadence | Our copy, mean |
+| --- | --- | --- | --- |
+| argb8 | 0.57 / 0.57 | 24.0 fps | 0.71–0.74 ms |
+| bgra8 | 0.62 / 0.57 | 24.0 fps | 0.67–0.74 ms |
+| argb16 (up-converted) | 0.58 / 0.59 | 24.1 fps | 1.53–1.56 ms |
+| argb32f (up-converted) | 0.59 / 0.61 | 24.0 fps | 3.0–3.1 ms |
+| bgra32f (up-converted) | 0.70 / 0.60 | 24.0 fps | 3.0 ms |
+
+(argb16 rows are labelled "16bpc" in the raw log; the switch to 16 bpc
+failed — AE refuses `bitsPerChannel = 16` from script under OCIO, "Not
+supported for OCIO color managed mode" — so they are an 8 bpc project
+delivered as 16u.)
+
+**The host's up-convert is lost in the noise.** Pass-to-pass spread is
+±0.05 cores; the 8u → 32f difference is +0.02–0.04 cores at 24 fps — at most
+~1.7 ms of CPU per 4K frame, spread across AE's threads. Cadence holds 24 fps
+in every format.
+
+**The cost is on our side, and it scales with bytes.** Our copy is a plain
+memcpy in the probe: 0.7 ms (8u, 33 MB) → 1.5 ms (16u, 66 MB) → 3.0 ms
+(32f, 133 MB) — ~44 GB/s throughout, bandwidth-bound as A1c found. In the
+product the 32f path converts to half instead (2.67 ms, A1c), writing 66 MB.
+So for an 8 bpc project, "always take 32f" costs about **+2 ms of our CPU per
+4K frame and 2× the bytes** through the ring and QCView's upload, versus
+native 8u. For a 16 bpc project it costs ~+1.2 ms and the same bytes.
+
 ## Next
 
 Re-check OCIO with the fixed build. Decide how to get the native tier given

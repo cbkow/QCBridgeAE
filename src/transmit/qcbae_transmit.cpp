@@ -272,7 +272,44 @@ struct Instance {
     // rather than every frame.
     PrPixelFormat last_pf = PrPixelFormat_Invalid;
     int32_t     last_w = -1, last_h = -1, last_rowbytes = 0;
+
+    // Timing, summarised per burst of frames (A4: what does the host's tier
+    // conversion cost?). A burst ends on a gap over kBurstGap, a format
+    // change, or 240 frames. Not keyed on play mode: AE's preview playback
+    // pushes as playmode_Scrubbing with inTime -1, never as Playing.
+    // Arrival interval is host cadence; copy is our host -> ring pass;
+    // render is the host's GetRenderTime.
+    struct Run {
+        uint64_t n = 0;
+        double   first = 0, last = 0;       // arrival, seconds (monotonic)
+        double   interval_sum = 0, interval_max = 0;
+        double   copy_sum = 0, copy_max = 0;
+        int64_t  render_sum = 0;
+        std::string fmt;
+        int32_t  w = 0, h = 0;              // of the first frame; a change is logged
+    } run;
 };
+
+double now_s() {
+    struct timespec ts {};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9;
+}
+
+void flush_run(Instance* I, const char* why) {
+    auto& r = I->run;
+    if (r.n >= 2) {
+        const double span = r.last - r.first;
+        logf("BURST %s instance %d: %llu frames of %s %dx%d in %.2f s = %.2f fps; interval mean %.2f max %.2f ms; "
+             "copy mean %.3f max %.3f ms; host render mean %.2f ms",
+             why, I->id, (unsigned long long)r.n, r.fmt.c_str(), r.w, r.h, span,
+             span > 0 ? (r.n - 1) / span : 0.0,
+             1000.0 * r.interval_sum / (r.n - 1), 1000.0 * r.interval_max,
+             1000.0 * r.copy_sum / r.n, 1000.0 * r.copy_max,
+             static_cast<double>(r.render_sum) / r.n);
+    }
+    r = Instance::Run{};
+}
 
 Plugin*   plugin(const tmStdParms* sp)  { return static_cast<Plugin*>(sp->ioPrivatePluginData); }
 Instance* instance(const tmInstance* i) { return static_cast<Instance*>(i->ioPrivateInstanceData); }
@@ -384,6 +421,7 @@ tmResult DisposeInstance(const tmStdParms*, tmInstance* inst) {
     return guarded("DisposeInstance", [&] {
         Instance* I = instance(inst);
         if (I != nullptr) {
+            flush_run(I, "disposed");
             logf("instance %d disposed after %llu frames (stopped %llu, playing %llu, scrubbing %llu)",
                  I->id, (unsigned long long)I->frames, (unsigned long long)I->by_mode[0],
                  (unsigned long long)I->by_mode[1], (unsigned long long)I->by_mode[2]);
@@ -488,6 +526,10 @@ void publish(Plugin* P, Instance* I, const tmInstance* inst, const tmPushVideo* 
     const int mode = pv->inPlayMode == playmode_Playing ? 1 : pv->inPlayMode == playmode_Scrubbing ? 2 : 0;
     ++I->frames;
     ++I->by_mode[mode];
+    const double arrived = now_s();
+    constexpr double kBurstGap = 0.5;
+    if (I->run.n > 0 && (arrived - I->run.last > kBurstGap || pf != I->last_pf
+                         || w != I->run.w || hgt != I->run.h)) flush_run(I, "ended");
 
     const FormatInfo* fi = find_format(pf);
     const bool changed = pf != I->last_pf || w != I->last_w || hgt != I->last_h
@@ -527,9 +569,27 @@ void publish(Plugin* P, Instance* I, const tmInstance* inst, const tmPushVideo* 
     }
     auto* dst = static_cast<uint8_t*>(S_ring.begin_write(static_cast<uint64_t>(dst_row) * uh));
     if (dst == nullptr) { logf("begin_write refused %ux%u", uw, uh); return; }
+    const double copy_start = now_s();
     for (uint32_t y = 0; y < uh; ++y)
         std::memcpy(dst + static_cast<size_t>(y) * dst_row,
                     base + static_cast<ptrdiff_t>(y) * rowbytes, tight);
+    const double copy_s = now_s() - copy_start;
+
+    {
+        auto& r = I->run;
+        if (r.n == 0) { r.first = arrived; r.fmt = fi->token; r.w = w; r.h = hgt; }
+        else {
+            const double iv = arrived - r.last;
+            r.interval_sum += iv;
+            if (iv > r.interval_max) r.interval_max = iv;
+        }
+        r.last = arrived;
+        ++r.n;
+        r.copy_sum += copy_s;
+        if (copy_s > r.copy_max) r.copy_max = copy_s;
+        r.render_sum += render_ms > 0 ? render_ms : 0;
+        if (r.n == 240) flush_run(I, "window");
+    }
 
     FrameDesc d {};
     d.width         = uw;
