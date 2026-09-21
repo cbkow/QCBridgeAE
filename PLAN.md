@@ -369,7 +369,27 @@ Transmit delivers.)*
 | **A5 Windows parity** | Named file mapping (or D3D11 shared texture), MSVC build, F16C conversion, Transmit on Windows | Same A4/A6 checks pass on Windows |
 | **A7 Packaging** | Signing, notarization, installers both platforms | Installs clean on a machine that has never seen the SDK |
 
-**Later, not v1:** live in QCView's A/B (§QCView ingest).
+**Later, not v1 — its own project, after the full release (chris,
+2026-09-21): A/B follow mode.** B plays a reference (e.g. the approved
+render) in lockstep with the host's playhead, live A beside it. It changes a
+lot, which is why it is separate:
+- **QCView's clock.** Dual view runs a synced clock pump over two seekable
+  sources; here B follows an *external* clock (the host's). That is the
+  "live A + B" compositor-pairing mode QCView's own code anticipates
+  (`setBSource`'s comment), and B must *play* at the host's rate during
+  playback, not seek per frame.
+- **OCIO.** QCView applies one global input transform after compositing, so
+  A and B must share an encoding. A reference in a different space than the
+  host's working space needs per-side input transforms — a QCView change.
+- **The host's time.** Premiere already sends it: every pushed frame carries
+  the true sequence time and play mode (A4). After Effects does not (`inTime`
+  −1, always "scrubbing"), so it needs a small companion AEGP reading the
+  active comp's time (`AEGP_GetItemCurrentTime`, idle hook, never renders)
+  into the ring header. **First spike:** that call is documented "not updated
+  while rendering" — does it advance during RAM-preview playback? The answer
+  decides the AE side. (Transmit's own playback clock would carry start
+  time/speed/loop without imagery, but only by making the device the host's
+  clock and audio device — not worth it for a position signal.)
 
 Everything through A6 builds on macOS with what is in `private/sdk/`. A3 needs
 QCView-Player checked out alongside.
