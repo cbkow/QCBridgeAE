@@ -391,10 +391,10 @@ governs the shared notes folder.
 - ~~Does AE honour `kPrWorkingColorSpace`?~~ Yes under Adobe CMS (via
   `outName`, one string per mode); ignored under OCIO, where pixels arrive
   untransformed anyway. 32f offered with it. (A4, D5)
-- **Focus loss deactivates video** (`ApplicationLostFocus`, observed in A4).
-  Does "Disable video output when in the background" control it? If the
-  stream cannot survive AE losing focus, Route A has a usability problem —
-  the user is meant to be looking at QCView. (A4, next)
+- ~~Does focus loss kill the stream?~~ Yes by default; **no** once the user
+  unticks "Disable video output when in the background" (A4). Needs a setup
+  step, and the device should flag the deactivation in the sidecar so QCView
+  can tell the user why the feed froze. (A6 / A3)
 - ~~Premultiplied?~~ Moot for AE: frames arrive composited and opaque. Is it
   the comp background or black? The comp background colour (A4). Premiere: check.
 - What does AE push while idle? Observed: one frame per viewer change, as

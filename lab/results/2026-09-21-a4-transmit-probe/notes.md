@@ -243,9 +243,31 @@ comp's background colour, not black. QCView receives what AE's viewer shows
 with the transparency grid off. A comp with a coloured background delivers
 that colour wherever it is transparent; the feed never carries alpha.
 
+## 12. The background preference controls focus loss
+
+With AE's default preferences, every focus loss sent `ActivateDeactivate`
+event 3 (`PrActivationEvent_ApplicationLostFocus`) with video off, and frames
+stopped (section 5). After unticking **Preferences → Video Preview →
+"Disable video output when in the background"** (by hand):
+
+- AE rendered a frame in front; focus moved to Finder (confirmed with
+  `lsappinfo front`); three comp changes were then triggered by script with
+  Finder still frontmost.
+- **No deactivation event at all**, and all three renders arrived while AE
+  was in the background.
+
+So the stream survives focus loss, but only with a non-default preference.
+The device cannot change it (no API seen). What it can do: it *knows* when
+the host deactivates it for focus loss, so it can say so — a sidecar flag
+QCView turns into "AE paused the feed: untick 'Disable video output when in
+the background'". Otherwise the user sees a frozen frame with no reason.
+
+Each viewer change pushes **two** frames ~3 ms apart (seen as ~300 fps
+"bursts" of 2 frames); cheap at this size, but the product should not treat
+the pair as two distinct frames to process expensively.
+
 ## Next
 
-Re-check OCIO with the fixed build. Decide how to get the native tier given
-the host always prefers 32f (section 1, 8). Then:
-the SEI-tag control, background preference, comp background colour,
-playback timing, and Premiere.
+Remaining: playback timestamps (AE preview arrives as scrubbing with no
+time), and Premiere. The SEI-tag control is no longer needed — the colour
+question was settled without it.

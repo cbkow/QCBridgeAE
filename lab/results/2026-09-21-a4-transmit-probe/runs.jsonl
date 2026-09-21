@@ -36,3 +36,4 @@
 {"run": "perf-F", "project_bpc": 8, "cms": "ocio", "size": "3840x2160", "fps": 24, "offered": ["argb32f"], "delivered": "argb32f", "ae_cpu_cores": 0.59, "copy_ms_mean": 3.078, "cadence_fps": 24.0, "host_render_ms": 0, "note": "cached preview playback, viewer Full res"}
 {"run": "perf-F2", "project_bpc": 8, "cms": "ocio", "size": "3840x2160", "fps": 24, "offered": ["argb32f"], "delivered": "argb32f", "ae_cpu_cores": 0.57, "copy_ms_mean": 3.138, "cadence_fps": 24.0, "host_render_ms": 0, "note": "cached preview playback, viewer Full res"}
 {"run":"bg-blue","project_bpc":8,"offered":["argb32f","bgra32f"],"delivered":"bgra32f","comp_bg":[0,0,1],"half50_rgba":[0.4,0.2,0.6,1.0],"result":"flattened over comp background"}
+{"run":"focus-pref-off","pref_disable_in_background":false,"frontmost":"Finder","deactivation_events":0,"frames_delivered_in_background":"yes (3 renders)"}
