@@ -47,15 +47,18 @@ set(QCBAE_AE_SDK "${CMAKE_CURRENT_SOURCE_DIR}/private/sdk/AfterEffectsSDK"
     CACHE PATH "After Effects SDK root (not included; see PLAN.md)")
 set(_ae_headers "${QCBAE_AE_SDK}/Examples/Headers")
 
-if(APPLE AND EXISTS "${_ae_headers}/AE_Effect.h")
-    message(STATUS "AE SDK found: ${QCBAE_AE_SDK}")
-    find_program(REZ_TOOL Rez)
+if(APPLE)
     set(QCBAE_CODESIGN_IDENTITY "-" CACHE STRING "codesign identity (- = ad-hoc)")
     if(QCBAE_CODESIGN_IDENTITY STREQUAL "-")
         set(_sign_flags --force --deep --sign -)
     else()
         set(_sign_flags --force --deep --options runtime --timestamp --sign "${QCBAE_CODESIGN_IDENTITY}")
     endif()
+endif()
+
+if(APPLE AND EXISTS "${_ae_headers}/AE_Effect.h")
+    message(STATUS "AE SDK found: ${QCBAE_AE_SDK}")
+    find_program(REZ_TOOL Rez)
 
     add_library(qcbae-aegp MODULE src/aegp/qcbae_aegp.cpp)
     target_link_libraries(qcbae-aegp PRIVATE qcbae_common)
@@ -96,6 +99,42 @@ if(APPLE AND EXISTS "${_ae_headers}/AE_Effect.h")
         COMMENT "PiPL into bundle, then codesign" VERBATIM)
 else()
     message(STATUS "AE SDK not found at ${QCBAE_AE_SDK} — skipping qcbae-aegp (everything else still builds)")
+endif()
+
+# ---------------------------------------------------------------------------
+# qcbae-transmit — the Mercury Transmit device (phase A4 probe, Route A).
+#
+# Needs the Premiere Pro SDK, also Adobe Confidential and also private/ only.
+# A Transmit plugin on macOS is a plain BNDL bundle: no PiPL, and its whole
+# ABI is one exported symbol, xTransmitEntry (PLAN.md §The tap). The same
+# bundle loads in AE and Premiere from MediaCore (D6).
+# ---------------------------------------------------------------------------
+set(QCBAE_PR_SDK "${CMAKE_CURRENT_SOURCE_DIR}/private/sdk/PremiereProSDK"
+    CACHE PATH "Premiere Pro SDK root (not included; see PLAN.md)")
+set(_pr_headers "${QCBAE_PR_SDK}/Examples/Headers")
+
+if(APPLE AND EXISTS "${_pr_headers}/PrSDKTransmit.h")
+    message(STATUS "Premiere SDK found: ${QCBAE_PR_SDK}")
+    add_library(qcbae-transmit MODULE src/transmit/qcbae_transmit.cpp)
+    target_link_libraries(qcbae-transmit PRIVATE qcbae_common)
+    target_include_directories(qcbae-transmit PRIVATE "${_pr_headers}")
+    set_target_properties(qcbae-transmit PROPERTIES
+        BUNDLE TRUE
+        BUNDLE_EXTENSION "bundle"
+        OUTPUT_NAME "QCBridgeAE-Transmit"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/src/transmit/Info.plist.in")
+    # The host binds by name; -dead_strip would otherwise take the entry point.
+    target_link_options(qcbae-transmit PRIVATE "-Wl,-exported_symbol,_xTransmitEntry" "-Wl,-dead_strip")
+    # Same reason as the AEGP: POST_BUILD only runs on relink, so a plist-only
+    # edit must force one or the signature stops matching the bundle.
+    set_property(TARGET qcbae-transmit APPEND PROPERTY LINK_DEPENDS
+                 "${CMAKE_CURRENT_SOURCE_DIR}/src/transmit/Info.plist.in")
+    add_custom_command(TARGET qcbae-transmit POST_BUILD
+        COMMAND codesign ${_sign_flags} "$<TARGET_BUNDLE_DIR:qcbae-transmit>"
+        COMMAND codesign --verify --deep --strict "$<TARGET_BUNDLE_DIR:qcbae-transmit>"
+        COMMENT "codesign (qcbae-transmit)" VERBATIM)
+else()
+    message(STATUS "Premiere SDK not found at ${QCBAE_PR_SDK} — skipping qcbae-transmit")
 endif()
 
 # ---------------------------------------------------------------------------

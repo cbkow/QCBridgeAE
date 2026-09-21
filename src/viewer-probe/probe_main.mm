@@ -28,7 +28,9 @@
 
 #include "common/surface/shared_ring.h"
 
+#include <cerrno>
 #include <chrono>
+#include <signal.h>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -211,6 +213,16 @@ int run_dump(int argc, const char** argv) {
         std::fprintf(stderr, "dump: %s\n", ring.error().c_str());
         return 1;
     }
+    // A producer that dies without unlinking (crash, kill, a module reset
+    // that skips the destructor) leaves a ring whose last frame still reads
+    // perfectly. Without this check a dump reports a dead producer's frame as
+    // a live measurement — seen for real on 2026-09-21. The ring records its
+    // producer's pid; if that process is gone, say so loudly and fail.
+    const pid_t producer = static_cast<pid_t>(ring.header()->producer_pid);
+    const bool alive = producer > 0 && (::kill(producer, 0) == 0 || errno == EPERM);
+    if (!alive)
+        std::printf("STALE RING: producer pid %d is not running — this frame is from a dead producer\n",
+                    static_cast<int>(producer));
     uint64_t last_seen = 0;
     FrameDesc d{};
     const void* pixels = nullptr;
@@ -242,32 +254,56 @@ int run_dump(int argc, const char** argv) {
                 icc.size() >= 20 ? icc.substr(16, 4).c_str() : "?",
                 (unsigned long long)d.icc_generation);
 
-    // Sample points given as x,y pairs on the command line.
-    std::printf("\nsamples (as stored, AE channel order):\n");
+    // Sample points given as x,y pairs on the command line. Printed in the
+    // order they are stored, labelled by the sidecar's channel_order: the
+    // Transmit probe carries BGRA as well as AE's ARGB, and a fixed label
+    // would silently swap red and blue.
+    const char* labels = d.channel_order == ChannelOrder::ARGB ? "ARGB"
+                       : d.channel_order == ChannelOrder::BGRA ? "BGRA" : "RGBA";
+    std::printf("\nsamples (as stored, %s order):\n", labels);
+    auto h2f = [](uint16_t h) {
+        const uint32_t sign = (uint32_t)(h & 0x8000u) << 16;
+        const uint32_t exp = (h >> 10) & 0x1Fu, man = h & 0x3FFu;
+        float f;
+        if (exp == 0) {                       // zero or subnormal: man * 2^-24
+            f = std::ldexp(static_cast<float>(man), -24);
+            return sign ? -f : f;
+        }
+        const uint32_t b = sign | (exp == 31 ? 0x7F800000u : (exp - 15 + 127) << 23) | (man << 13);
+        std::memcpy(&f, &b, 4);
+        return f;
+    };
     for (int i = 2; i + 1 < argc; i += 2) {
         const uint32_t x = (uint32_t)std::atoi(argv[i]), y = (uint32_t)std::atoi(argv[i + 1]);
         if (x >= d.width || y >= d.height) { std::printf("  (%u,%u) out of range\n", x, y); continue; }
         const auto* row = static_cast<const uint8_t*>(pixels) + (size_t)y * d.bytes_per_row;
+        double v[4] = {0, 0, 0, 0};
+        const char* note = "";
         if (d.pixel_format == PixelFormat::RGBA8Unorm) {
             const uint8_t* p = row + x * 4;
-            std::printf("  (%4u,%4u)  A=%3u R=%3u G=%3u B=%3u\n", x, y, p[0], p[1], p[2], p[3]);
+            for (int c = 0; c < 4; ++c) v[c] = p[c];
         } else if (d.pixel_format == PixelFormat::RGBA16Unorm) {
             const auto* p = reinterpret_cast<const uint16_t*>(row) + x * 4;
-            std::printf("  (%4u,%4u)  A=%5u R=%5u G=%5u B=%5u   (AE white = 32768)\n",
-                        x, y, p[0], p[1], p[2], p[3]);
+            for (int c = 0; c < 4; ++c) v[c] = p[c];
+            note = "   (Adobe white = 32768)";
+        } else if (d.pixel_format == PixelFormat::RGBA32Float) {
+            const auto* p = reinterpret_cast<const float*>(row) + x * 4;
+            for (int c = 0; c < 4; ++c) v[c] = p[c];
         } else {
             const auto* p = reinterpret_cast<const uint16_t*>(row) + x * 4;
-            auto h2f = [](uint16_t h) {
-                const int e = ((h >> 10) & 0x1F) - 15 + 127;
-                const uint32_t b = ((uint32_t)(h & 0x8000u) << 16) | ((uint32_t)e << 23)
-                                 | ((uint32_t)(h & 0x3FFu) << 13);
-                float f; std::memcpy(&f, &b, 4); return (h & 0x7FFFu) ? f : 0.0f; };
-            std::printf("  (%4u,%4u)  A=%.5f R=%.5f G=%.5f B=%.5f\n",
-                        x, y, h2f(p[0]), h2f(p[1]), h2f(p[2]), h2f(p[3]));
+            for (int c = 0; c < 4; ++c) v[c] = h2f(p[c]);
         }
+        const bool integer = d.pixel_format == PixelFormat::RGBA8Unorm
+                          || d.pixel_format == PixelFormat::RGBA16Unorm;
+        std::printf("  (%4u,%4u) ", x, y);
+        for (int c = 0; c < 4; ++c) {
+            if (integer) std::printf(" %c=%5.0f", labels[c], v[c]);
+            else         std::printf(" %c=%.6f", labels[c], v[c]);
+        }
+        std::printf("%s\n", note);
     }
     ring.release();
-    return 0;
+    return alive ? 0 : 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -401,6 +437,7 @@ fragment float4 f_main(VSOut in [[stage_in]],
         case PixelFormat::RGBA8Unorm:  mpf = MTLPixelFormatRGBA8Unorm;  break;
         case PixelFormat::RGBA16Unorm: mpf = MTLPixelFormatRGBA16Unorm; break;
         case PixelFormat::RGBA16F:     mpf = MTLPixelFormatRGBA16Float; break;
+        case PixelFormat::RGBA32Float: mpf = MTLPixelFormatRGBA32Float; break;   // A4 Transmit probe
         default: return nil;
     }
     id<MTLBuffer> buf = [_device newBufferWithBytesNoCopy:const_cast<void*>(pixels)
@@ -469,6 +506,7 @@ fragment float4 f_main(VSOut in [[stage_in]],
             d.width, d.height,
             d.pixel_format == PixelFormat::RGBA8Unorm  ? "8i native"
               : d.pixel_format == PixelFormat::RGBA16Unorm ? "16i native"
+              : d.pixel_format == PixelFormat::RGBA32Float ? "32f native"
               : "32f->16f",
             (unsigned long long)_lastSeen, (unsigned long long)_framesShown,
             (unsigned long long)skipped, _framesShown / since, d.comp_name];
