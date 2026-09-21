@@ -173,8 +173,14 @@ alone it means BT.709 full-range 32f. The Premiere SDK defines a token for
 exactly our case, `kPrWorkingColorSpace` ("Working Color Space",
 `PrSDKColorSpaces.h`): passed back, it tells the host to render in its current
 working space. That is the generic "working space" QCView should receive.
-Documented, **not yet verified under AE** — A4 checks it with known-value
-solids under both Adobe CMS and OCIO/ACEScg, as A2b did for the AEGP.
+**Measured in A4 (2026-09-21): under OCIO, AE ignores the request
+entirely** — working space, unset, sRGB and BT.2020 all deliver the same
+untransformed working-space values (`lab/results/2026-09-21-a4-transmit-probe/`).
+That is the outcome we want: raw RGBA, interpreted by hand in QCView. The
+device still **always requests `kPrWorkingColorSpace`, never leaves it unset**:
+ignored, it costs nothing; honoured — under Adobe CMS, or by a future AE — it
+asks for exactly the raw signal, where unset would mean a Rec.709 conversion.
+Adobe CMS with a working space set is the remaining check.
 
 In QCView the feed is labelled only as working space; the user sets the input
 transform in its OCIO panel, which is a single global input — there is no
