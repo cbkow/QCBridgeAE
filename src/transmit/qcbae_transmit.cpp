@@ -47,6 +47,7 @@
 #include <cstring>
 #include <ctime>
 #include <exception>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -98,8 +99,24 @@ struct Ring {
     Host       host {};
     uint64_t   published = 0, skipped_duplicates = 0;
     std::vector<unsigned char> last_key;
+
+    // Host state is derived, not last-writer-wins. AE creates and discards
+    // an instance for every item it touches while opening a project (seen in
+    // the A6 log: a dozen in one second), and an old instance's deactivation
+    // can arrive after its replacement's activation. The ring reads Active
+    // while any instance has video on; paused only when none do, with the
+    // reason of the last deactivation.
+    std::set<csSDK_int32> video_on;
+    HostState last_pause = HostState::Paused;
 };
 Ring S;
+
+HostState derived_state() {
+    return S.video_on.empty() ? S.last_pause : HostState::Active;
+}
+void publish_state() {
+    if (S.ring.valid()) S.ring.set_host_state(derived_state());
+}
 
 // Replacing a mapping tells whoever holds the old one to let go first.
 void retire_ring(const char* why) {
@@ -210,14 +227,15 @@ tmResult CreateInstance(const tmStdParms*, tmInstance* inst) {
         // Informational only: AE reports a 720x480 placeholder here until a
         // comp is open (A4). Geometry comes from each frame.
         logf("instance %d: %dx%d", inst->inInstanceID, inst->inVideoWidth, inst->inVideoHeight);
-        if (S.ring.valid()) S.ring.set_host_state(HostState::Active);
         return tmResult_Success;
     });
 }
 
 tmResult DisposeInstance(const tmStdParms*, tmInstance* inst) {
     return guarded("DisposeInstance", [&] {
-        logf("instance %d disposed", inst->inInstanceID);
+        S.video_on.erase(inst->inInstanceID);
+        publish_state();
+        logf("instance %d disposed -> state %u", inst->inInstanceID, static_cast<unsigned>(derived_state()));
         return tmResult_Success;
     });
 }
@@ -259,12 +277,16 @@ tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance*, csSDK_int32 ind
 tmResult ActivateDeactivate(const tmStdParms*, const tmInstance* inst, PrActivationEvent ev,
                             prBool, prBool videoActive) {
     return guarded("ActivateDeactivate", [&] {
-        const HostState st = videoActive ? HostState::Active
-                           : ev == PrActivationEvent_ApplicationLostFocus ? HostState::PausedFocus
-                           : HostState::Paused;
-        if (S.ring.valid()) S.ring.set_host_state(st);
+        if (videoActive) {
+            S.video_on.insert(inst->inInstanceID);
+        } else {
+            S.video_on.erase(inst->inInstanceID);
+            S.last_pause = ev == PrActivationEvent_ApplicationLostFocus ? HostState::PausedFocus
+                                                                        : HostState::Paused;
+        }
+        publish_state();
         logf("instance %d: activation event %d, video %d -> state %u", inst->inInstanceID,
-             static_cast<int>(ev), videoActive, static_cast<unsigned>(st));
+             static_cast<int>(ev), videoActive, static_cast<unsigned>(derived_state()));
         return tmResult_Success;
     });
 }
@@ -326,7 +348,7 @@ void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
     d.value_scale   = 1.0f;
     std::snprintf(d.comp_name, sizeof d.comp_name, "%s", S.host.label);
     S.ring.commit(d);
-    S.ring.set_host_state(HostState::Active);
+    publish_state();   // a new ring starts Active (zeroed); make it tell the truth
 
     if (++S.published == 1 || (S.published % 500) == 0 || cr.has_inf || cr.has_nan)
         logf("published %llu (%ux%u %s%s%s), %llu duplicates skipped", (unsigned long long)S.published,

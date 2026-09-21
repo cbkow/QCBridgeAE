@@ -335,6 +335,14 @@ stride. Live status, reconnect and hold-last-frame-on-dropout come with it.
   own texture, so the A1b zero-copy does not carry through this path. At ~1 ms
   a 4K frame it isn't worth chasing in v1.
 
+**Liveness is the consumer's job (A6).** AE quits without unloading the
+device, so the ring is never marked Retired and never unlinked: it survives,
+readable, with its last frame and a stale host state. QCView must check the
+ring's `producer_pid` is alive (`kill(pid, 0)`, EPERM counts as alive) before
+trusting anything in it, then read `host_state` (Active / PausedFocus /
+Paused / Retired — `shared_ring.h`) to explain a freeze, re-opening the name
+on Retired. Ring names: `/qcbae-ae`, `/qcbae-premiere`.
+
 **Why A/B is out of v1.** Live is blocked from A/B deliberately, at three
 guards (`setCompositorMode`, `setBSource`, the dual-capable check). A/B runs on
 a master clock pumping two seekable, frame-addressed sources with fps and
