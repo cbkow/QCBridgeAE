@@ -17,15 +17,21 @@ the `minColor` repo's convention.
 
 ## What's yours
 
-Phase **A5** (`PLAN.md`): Windows parity for the surface spine and the AEGP tap.
+Phase **A5** (`PLAN.md`): Windows parity for the ring, the Transmit device
+(the product since 2026-09-21, `PLAN.md` D7) and, as a test instrument, the
+AEGP tap.
 
-The macOS side uses IOSurface, which has no Windows equivalent. Yours is:
+The macOS side does **not** use IOSurface any more — it is a page-aligned
+POSIX shared mapping (`PLAN.md` D8, measured zero-copy on Apple Silicon). The
+same shape on Windows is a **named file mapping**, and that is the first thing
+to try: `src/common` is written for it. The fallback, only if a mapping cannot
+back a texture without a staging copy:
 
 - `ID3D11Texture2D`, `DXGI_FORMAT_R16G16B16A16_FLOAT`
 - created with `D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX`
 - handed to the consumer as an NT handle; opened via `OpenSharedResource1`
-- `IDXGIKeyedMutex` for producer/consumer sync — this replaces the macOS
-  ready-signal, so the sidecar channel carries no sync role on Windows
+- `IDXGIKeyedMutex` for producer/consumer sync — an alternative to the ring's
+  seqlock + reader claim, not an addition
 
 Expect one PCIe upload on a discrete GPU. That is understood and accepted; do
 not chase it. The macOS number will look better because Apple Silicon has
@@ -34,9 +40,9 @@ they differ.
 
 ## The 32 bpc conversion needs F16C
 
-Per `PLAN.md` D1, the 8 and 16 bpc tiers are carried natively and never
-converted — nothing to do there. The 32 bpc tier converts to half, and it must
-use **hardware** conversion: `_mm256_cvtps_ph` (F16C, on every x86-64 part
+Under Transmit, v1 asks the host for 32f and converts everything to half in
+the plugin (`PLAN.md` D1, Transmit note), so on Windows this is the main path,
+not an edge case. It must use **hardware** conversion: `_mm256_cvtps_ph` (F16C, on every x86-64 part
 since 2012). The portable scalar fallback measured **12.55 ms vs 2.67 ms** at
 4K on the macOS side — 4.7x, or ~80 fps versus ~374. The same gap will show up
 on x86 if the intrinsic isn't used.
@@ -56,7 +62,7 @@ deserves revisiting for Windows specifically.
 
 | | Path |
 | --- | --- |
-| AEGP / effect | `%PROGRAMFILES%\Adobe\Adobe After Effects <ver>\Support Files\Plug-ins\` |
+| AEGP / effect | `%PROGRAMFILES%\Adobe\Adobe After Effects <ver>\Support Files\Plug-ins\` — on macOS AE also loads AEGPs from MediaCore (A2); untested here |
 | Transmit (shared — also loads in Premiere) | `%PROGRAMFILES%\Adobe\Common\Plug-ins\7.0\MediaCore\` |
 
 ## Reporting back

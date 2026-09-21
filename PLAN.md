@@ -1,24 +1,33 @@
 # QCBridgeAE: an After Effects beauty window for QCView
 
-Committed 2026-09-20 (chris). Repo copy of the plan; running findings live in
-`lab/`, which is also the channel to the Windows machine.
+Committed 2026-09-20 (chris); reframed 2026-09-21. Repo copy of the plan;
+running findings live in `lab/`, which is also the channel to the Windows
+machine.
 
 ## What this is
 
-An After Effects comp, live in QCView, as **untransformed pixel data** — so
-QCView's OCIO chain, A/B wipes and EDR paths operate on the signal AE actually
-computed, not on a Rec.709 rendering of it.
+**A Mercury Transmit plugin that streams to QCView.** An After Effects comp,
+live in QCView, as **untransformed pixel data** — so QCView's OCIO chain and
+EDR paths operate on the signal AE actually computed, not on a Rec.709
+rendering of it. Premiere gets the same device for free (D6).
+
+The AEGP tap built in A2 (Route B) was scaffolding: it proved the ring, the
+pixel fidelity and the colour behaviour against a live AE comp. It stays useful
+as an instrument; it is not the product. See D7.
+
+**v1 scope (2026-09-21):** live AE → QCView in QCView's single view, OCIO set
+by hand in QCView. **A/B is out of v1** — it needs a deliberate build-out on
+the QCView side (§QCView ingest), and will get one later.
 
 **This is not QCBridge for AE.** The only parity is what the user sees at the
-far end: a live item in QCView, correct bit depth, OCIO engaged, A/B working.
-Everything upstream is different:
+far end: a live item in QCView, OCIO engaged. Everything upstream is different:
 
 | | QCBridge (Blender) | QCBridgeAE |
 | --- | --- | --- |
 | Machines | Two — host + GPU replica | **One.** AE and QCView side by side |
 | Transport | SRT / QUIC over LAN or VPN | **Shared GPU surface.** No network code at all |
-| Signal | HEVC 10-bit 4:2:0, BT.709 tagged | RGBA16F, untransformed, working space tagged |
-| Source cadence | Continuous 30–60 fps viewport | Event-driven: a frame exists when AE renders one |
+| Signal | HEVC 10-bit 4:2:0, BT.709 tagged | RGBA, untransformed, in AE's working space (D1, D5) |
+| Source cadence | Continuous 30–60 fps viewport | Event-driven: AE pushes a frame when it renders one |
 | Purpose | Offload the render to a bigger GPU | Give AE a viewer it doesn't have |
 
 ## Decisions
@@ -66,6 +75,19 @@ it is a flag rather than a rewrite.
 The x86 equivalent is F16C `_mm256_cvtps_ph`, available since 2012. The integer
 tiers sidestep the question entirely by never converting.
 
+**Under Transmit, v1 carries one format: `RGBA16F`.** *(2026-09-21, pending
+A4.)* The per-tier table above was measured on the AEGP tap, where we chose the
+world type. A Transmit device instead *asks* the host for a pixel format, and
+QCView's floor turned out to be 16F everywhere (§QCView ingest): every source
+is resampled into an `RGBA16F` canvas before OCIO sees it, so 16u's extra bits
+die at QCView's first render target whatever the wire carries. The plan for v1:
+request 32f in the working space (D5), and have the plugin convert to half and
+reorder Premiere's BGRA to RGBA in the one pass that already touches every
+pixel. QCView then gets a single ingest path. Keeping 8 bpc native to halve
+the bytes remains possible later — it costs QCView a second path, and A4 will
+show whether AE even offers integer formats to a Transmit device. The ring's
+per-tier support stays built and tested either way.
+
 **D2 — Accepted precision losses, written down on purpose.**
 - 32f → 16f: 24-bit significand to 11-bit. Accepted (chris, 2026-09-20),
   re-examined against measurements the same day and **confirmed**: native is
@@ -76,8 +98,11 @@ tiers sidestep the question entirely by never converting.
   (D1 revision) — `RGBA16Unorm` carries all 15 bits. Whether they survive
   *inside* QCView depends on where it quantizes to 16F: if OCIO runs in the
   same pass as the sample, fp32 registers carry them and only the output
-  quantizes; if it writes a 16F intermediate first, they die there. **Open,
-  A3.** The speed and byte-count wins hold either way.
+  quantizes; if it writes a 16F intermediate first, they die there.
+  **Answered 2026-09-21, by reading QCView's renderers:** it writes a 16F
+  intermediate first — the source is bilinear-resampled into a viewport-sized
+  `RGBA16F` canvas and OCIO runs on that. The extra bits die inside QCView.
+  The speed and byte-count wins hold either way.
 - 8bpc: exact, and now exact without touching a pixel.
 
 **D3 — Normalize 16bpc by 32768, not 65535.** With D1's revision this moves to
@@ -115,6 +140,20 @@ change, and is correct under Adobe colour management — but as an **optional
 hint that must never be presented as authoritative**. Under OCIO it does not
 track the working space, so it is not dependable for drift detection either.
 
+**Under Transmit the device, not the host, names the colour space** — and the
+default is wrong for us. `tmVideoMode.outColorSpaceRec` is filled by the
+plugin in `QueryVideoMode`, the host renders into whatever it names, and left
+alone it means BT.709 full-range 32f. The Premiere SDK defines a token for
+exactly our case, `kPrWorkingColorSpace` ("Working Color Space",
+`PrSDKColorSpaces.h`): passed back, it tells the host to render in its current
+working space. That is the generic "working space" QCView should receive.
+Documented, **not yet verified under AE** — A4 checks it with known-value
+solids under both Adobe CMS and OCIO/ACEScg, as A2b did for the AEGP.
+
+In QCView the feed is labelled only as working space; the user sets the input
+transform in its OCIO panel, which is a single global input — there is no
+per-item colour space to fill in, and v1 does not add one.
+
 Imported media is AE's own business: Interpret Footage converts on import, and
 **Preserve RGB** is the escape hatch when it shouldn't. A manual step, kept
 with the person who knows what the footage is.
@@ -124,7 +163,12 @@ lives in the shared `/Library/Application Support/Adobe/Common/Plug-ins/7.0/
 MediaCore/` (`%PROGRAMFILES%\Adobe\Common\Plug-ins\7.0\MediaCore\` on Windows),
 so it loads into Premiere too. We take that: Premiere → QCView for free.
 
-**D7 — Route B first, Route A as the goal.** See below.
+**D7 — Route A is the product; Route B was the scaffold.** *(Revised
+2026-09-21; originally "Route B first, Route A as the goal".)* Route B did its
+job — it proved the ring and the pixel fidelity against a live comp — and its
+UI-thread ceiling (below) rules it out as the thing we ship. It stays in the
+tree as an instrument: a known-good producer to compare Transmit's output
+against. See below.
 
 **D8 — Shared memory rather than IOSurface.** See Transport, below.
 
@@ -132,9 +176,9 @@ so it loads into Premiere too. We take that: Premiere → QCView for free.
 
 | | **A — Mercury Transmit** | **B — AEGP + RenderSuite** |
 | --- | --- | --- |
-| SDK | Premiere Pro SDK — **not on this machine** | AE SDK — already vendored |
-| Delivery | Push; rides the preview AE already rendered | Pull; we request the render |
-| Color purity | **Unverified.** Depends on whether AE applies its display transform before the device sees the frame | **By construction** — we choose the world type |
+| SDK | Premiere Pro SDK (26.0, in `private/sdk/`) | AE SDK (26.5, in `private/sdk/`) |
+| Delivery | Push; rides the preview AE already rendered, with its `PrTime` | Pull; we request the render |
+| Color purity | **Unverified.** The device names the colour space it wants; `kPrWorkingColorSpace` should mean "no transform" (D5) | **By construction** — we choose the world type |
 | Gets Premiere | Yes (D6) | No |
 
 Route A's entire ABI is one exported symbol, `xTransmitEntry` — confirmed
@@ -155,9 +199,9 @@ reachable only through `PF_GetContextAsyncManager` in
 `PF_EffectCustomUISuite2` — DRAW-event specific, belonging to effects with
 custom UI. An AEGP cannot get one. A trivial 1280×720 comp costs ~30 ms of
 render per frame; a heavy comp blocks AE for as long as its frame takes.
-Throttling bounds how often we pay that, not how much. **A4 should weigh this
-more heavily than the original comparison did**: Route A pushes frames AE has
-already rendered and never asks the host for work.
+Throttling bounds how often we pay that, not how much. This is what settled
+D7: Route A pushes frames AE has already rendered and never asks the host for
+work.
 
 Known Route A risk: the Transmit host has a **"Disable video output when in the
 background"** preference. The whole premise here is that the user is looking at
@@ -201,20 +245,82 @@ seqlock per slot plus a reader claim the producer honours — no mutex, no
 ready-signal, and nothing for a crashed consumer to hold hostage. The Windows
 keyed-mutex option in A5 is an alternative to this, not an addition.
 
+## QCView ingest
+
+Read from QCView-Player 2.3.3 on 2026-09-21 (native Metal and D3D11
+renderers). This is what v1 plugs into, and what it has to change there.
+
+**The seam already exists.** `MediaType::LiveStream` is a media item kind, fed
+today by QCBridge over SRT. Its decoder owns no frame slot: it publishes into
+the main video decoder's latest-wins slot through
+`VideoDecoder::publishExternalFrame(FrameHandle, pts)`, and both renderers pull
+from there. A ring reader is a sibling of `LiveStreamDecoder` publishing the
+same way — `FrameHandle::cpuShared` can wrap a ring slot as a `QImage` view
+with our padded `bytesPerLine`, and both renderers' CPU paths honour the
+stride. Live status, reconnect and hold-last-frame-on-dropout come with it.
+
+**What has to change in QCView for v1:**
+- **A 16F branch in the CPU upload path**, both renderers. Today only
+  `RGBA8888` and `RGBA64` are accepted; anything else — including
+  `Format_RGBA16FPx4` — is silently converted to **8-bit**. Half-float reaches
+  the GPU today only via the image-sequence upload threads.
+- **Routing.** Anything containing `://` is treated as an SRT URL and handed to
+  the FFmpeg decoder, so the ring needs its own scheme or MediaType branch.
+  `WindowManager::m_liveDecoder` is typed as the SRT class, so a small live-source
+  base class comes out of `LiveStreamDecoder`.
+- Nothing downstream swizzles channels or applies a scale, so the plugin
+  delivers RGBA in 0..1-referenced float (D1's Transmit note).
+
+**Facts that bound the design:**
+- **16F is QCView's floor.** The source is bilinear-resampled into a
+  viewport-sized `RGBA16F` canvas (capped 3840×2160 on Metal), and OCIO runs
+  on that canvas, not the source. Nothing in QCView is fp32 except OCIO's LUTs;
+  EXRs are read as half.
+- **OCIO input is one global setting**, off by default, chosen in the
+  ColorPanel. No per-item input, no "working space" concept — the user picks.
+- **Straight alpha** everywhere; pixels with alpha 0 are discarded to the
+  background. If AE's Transmit frames are premultiplied, that has to be
+  handled (A4 finds out).
+- Over-range survives to an EDR / scRGB swapchain from a 16F source; SDR
+  swapchains clamp.
+- QCView's CPU slot uploads with `replaceRegion` / `UpdateSubresource` into its
+  own texture, so the A1b zero-copy does not carry through this path. At ~1 ms
+  a 4K frame it isn't worth chasing in v1.
+
+**Why A/B is out of v1.** Live is blocked from A/B deliberately, at three
+guards (`setCompositorMode`, `setBSource`, the dual-capable check). A/B runs on
+a master clock pumping two seekable, frame-addressed sources with fps and
+duration; a free-running live source breaks that model, and QCView's own
+comment names the fix as a dedicated live-A + scrubbed-B pairing mode. OCIO
+also runs once *after* compositing, so both sides must share an encoding. That
+is a deliberate QCView build-out, not something to back into. When it happens,
+Transmit's `PrTime` on every frame is what would let B follow AE's playhead.
+
 ## Phases
+
+Phase IDs are stable — `lab/` refers to them — so the table is in **execution
+order**, not numeric order. *(Reordered 2026-09-21 when Transmit became the
+product: A4 moved first because QCView's ingest format depends on what
+Transmit delivers.)*
 
 | Phase | Deliverable | Exit criteria |
 | --- | --- | --- |
 | **A1 Spine** ✅ | Shared-memory ring + sidecar + throwaway Metal viewer. No AE involved | ~~Synthetic frames land in the viewer; surfaces recycle without tearing~~ **Done 2026-09-20** — `lab/results/2026-09-20-a1-ring-spine/`, `-a1b-metal-probe/` |
 | **A2 AEGP tap** ✅ | AEGP plugin: render the active comp on idle, convert, publish. macOS | ~~A live AE comp appears in the probe viewer, bit-exact for 8bpc~~ **Done 2026-09-20** — bit-exact for 8 **and** 16 bpc, ICC sidecar live. `lab/results/2026-09-20-a2-aegp-tap/` |
-| **A3 QCView ingest** | Float inlet in QCView (new construction — everything there arrives via libavcodec today); OCIO Input driven by the sidecar ICC | Comp is live in QCView as a media item; OCIO engaged; A/B against an approved render works |
-| **A4 Transmit probe** | Premiere SDK; build its Transmit sample; log the `PrPixelFormat` list the host actually offers, under **both** AE and Premiere | Go / no-go on Route A, recorded in `lab/results/` |
-| **A5 Windows parity** | DXGI shared texture + keyed mutex; MSVC build of A1–A2 | Windows probe viewer matches macOS behaviour |
-| **A6 Transmit plugin** | Route A implementation, if A4 is green. Ships Premiere support (D6) | Device appears in Preferences → Video Preview in both apps |
+| **A4 Transmit probe** | Minimal Transmit device from the Premiere SDK sample, publishing into the existing ring. Logs every `QueryVideoMode` negotiation and every pushed frame's format, colour space, alpha and time | Recorded in `lab/results/`, under **both** AE and Premiere: which pixel formats the host offers; whether `kPrWorkingColorSpace` delivers A2b's known-value solids untransformed under Adobe CMS **and** OCIO/ACEScg; premultiplied or straight; whether the stream survives AE losing focus. Go / no-go on Route A |
+| **A6 Transmit plugin** | The real device, if A4 is green: 32f in working space → `RGBA16F` RGBA into the ring, one pass. Ships Premiere support (D6) | Appears in Preferences → Video Preview in both apps; `qcbae-probe dump` matches the AEGP tap on the same comp |
+| **A3 QCView ingest** | Ring-reader live source in QCView (GPL, that repo), the 16F upload branch in both renderers, routing split from SRT. Single view only | Comp is live in QCView as a media item and follows AE; OCIO engaged by hand gives the expected picture; dropouts hold the last frame; bytes match `qcbae-probe dump` |
+| **A5 Windows parity** | Named file mapping (or D3D11 shared texture), MSVC build, F16C conversion, Transmit on Windows | Same A4/A6 checks pass on Windows |
 | **A7 Packaging** | Signing, notarization, installers both platforms | Installs clean on a machine that has never seen the SDK |
 
-A1–A2 are buildable today with what's on disk. A4 is independent of them and
-can run in parallel — it only needs a download.
+**Later, not v1:** live in QCView's A/B (§QCView ingest).
+
+Everything through A6 builds on macOS with what is in `private/sdk/`. A3 needs
+QCView-Player checked out alongside.
+
+**The A3 cold-pickup plan (`PLAN-A3.md`) was lost with the original machine**
+before it was committed. This table and §QCView ingest replace it. Plans get
+committed.
 
 ## Privacy and licensing
 
@@ -236,7 +342,7 @@ governs the shared notes folder.
 4. **The product never writes pixels to disk.** Debug frame dumps are an
    explicit opt-in, land in the OS temp dir, and never touch the project tree
    or this repo.
-5. **No network code, at all.** Same-machine IPC only — Mach port / named pipe,
+5. **No network code, at all.** Same-machine IPC only — shared memory by path,
    no sockets, no listeners. Nothing to firewall, nothing to pair, no TOFU
    design like QCBridge needed. This is a deliberate invariant: if a change
    wants a socket, the change is wrong.
@@ -249,13 +355,16 @@ governs the shared notes folder.
 
 ## Open questions
 
-- Does AE offer `32f_Linear` to a Transmit device, or a display-transformed
-  frame? (A4 — gates Route A entirely)
+- Does AE honour `kPrWorkingColorSpace` for a Transmit device, and offer a 32f
+  format with it — or does it hand over a display-transformed frame? (A4 —
+  gates Route A entirely)
 - Does "Disable video output when in the background" kill the stream when AE
   loses focus? (A4)
-- Route B cadence: which AEGP hook drives the pull — idle hook plus change
-  detection? What does it cost when AE's frame cache misses?
-- Does the sidecar ICC need to become an OCIO colorspace *name* for QCView's
-  Input node, or can QCView consume the ICC directly?
-- Alpha: is straight vs premultiplied a QC concern worth surfacing in the UI,
-  or just a correctly-set flag?
+- Are Transmit frames premultiplied? If so, un-premultiply in the plugin or
+  flag it for QCView, which assumes straight alpha? (A4 measures, then decide)
+- What does AE push while idle — one frame per change, or nothing until
+  playback? QCView holds the last frame either way, but a comp edit must
+  arrive. (A4)
+- Is 8 bpc worth carrying natively later, to halve the bytes, at the cost of a
+  second ingest path in QCView? Not for v1.
+- ~~Route B cadence~~ and ~~ICC → OCIO name~~: retired with D5 and D7.
