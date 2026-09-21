@@ -235,6 +235,14 @@ So for an 8 bpc project, "always take 32f" costs about **+2 ms of our CPU per
 4K frame and 2× the bytes** through the ring and QCView's upload, versus
 native 8u. For a 16 bpc project it costs ~+1.2 ms and the same bytes.
 
+## 11. Transparency is flattened over the comp background colour
+
+Solids comp background set to (0, 0, 1) by script. The 50% (0.8, 0.4, 0.2)
+solid now reads **(0.4, 0.2, 0.6)**, alpha 1.0 — i.e. composited over the
+comp's background colour, not black. QCView receives what AE's viewer shows
+with the transparency grid off. A comp with a coloured background delivers
+that colour wherever it is transparent; the feed never carries alpha.
+
 ## Next
 
 Re-check OCIO with the fixed build. Decide how to get the native tier given

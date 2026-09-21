@@ -396,7 +396,7 @@ governs the shared notes folder.
   stream cannot survive AE losing focus, Route A has a usability problem —
   the user is meant to be looking at QCView. (A4, next)
 - ~~Premultiplied?~~ Moot for AE: frames arrive composited and opaque. Is it
-  the comp background or black they are flattened over? (A4) Premiere: check.
+  the comp background or black? The comp background colour (A4). Premiere: check.
 - What does AE push while idle? Observed: one frame per viewer change, as
   scrubbing with `inTime` −1; preview playback also arrives as scrubbing.
   Is there ever a comp time to show? (A4)
