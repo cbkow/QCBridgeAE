@@ -167,9 +167,31 @@ argb16, bit-exact.
 ignored and the pixels were untouched. Under Adobe CMS the request is live.
 The device has to be right for both.
 
+## 8. Confirmed: one `PrSDKString` per mode, and the request holds
+
+AE restarted with the fixed probe (fresh string allocated per
+`QueryVideoMode` call, never disposed by the plugin). Fresh untitled project,
+**Adobe CMS, 16 bpc, sRGB**; comp rebuilt by script.
+
+| Run | Offered | Colour space | Picked | Result |
+| --- | --- | --- | --- | --- |
+| R14b | argb32f, bgra32f | working | bgra32f | **untouched** (was converted as R14) |
+| R15b | argb8, argb16, argb32f | working | argb32f | **untouched** (was converted as R15) |
+| R11b | all six | working | bgra32f | **untouched** (was converted as R11) |
+| R10b | argb32f | unset | argb32f | converted — the control still moves |
+
+The hypothesis holds: the host takes ownership of each `outName` it reads.
+**Rule for A6: allocate a new `PrSDKString` for every mode, never dispose
+it.**
+
+R15b also repeats the format finding at a fourth combination: offered
+8u/16u/32f in ARGB order only, a 16 bpc project gets **32f**. The host prefers
+32f whatever the project depth and whatever the order; the only way observed
+so far to get an integer tier is to offer it alone.
+
 ## Next
 
-After an AE restart with the new build: confirm per-mode strings fix
-multi-mode (repeat R14/R15), and re-check OCIO with the fixed build. Then:
+Re-check OCIO with the fixed build. Decide how to get the native tier given
+the host always prefers 32f (section 1, 8). Then:
 the SEI-tag control, background preference, comp background colour,
 playback timing, and Premiere.
