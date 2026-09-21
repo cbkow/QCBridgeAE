@@ -22,6 +22,9 @@
 //   modes       = argb8, argb16, argb32f, bgra8, bgra16, bgra32f
 //                 (also *32f_linear, prgb*, bgrp*, xrgb*, bgrx*, any)
 //   colorspace  = working | unset | <a predefined name, e.g. BT.709 RGB Full (Scene)>
+//                 | sei:pq2020 | sei:srgb | sei:709   — SEI-tag form, the only
+//                 encoding Adobe's sample demonstrates; a control for whether
+//                 the host reads the colour-space record at all
 //   cs_encoding = both | buffer | name   — how a predefined name is passed.
 //                 The SDK documents the token but no sample fills one, so
 //                 which field the host reads is itself an A4 question.
@@ -37,6 +40,7 @@
 #include "PrSDKPixelFormat.h"
 #include "PrSDKColorSpaces.h"
 #include "PrSDKColorProfile.h"
+#include "PrSDKColorSEICodes.h"
 #include "SPBasic.h"
 
 #include "common/surface/shared_ring.h"
@@ -155,6 +159,8 @@ struct Config {
     std::vector<PrPixelFormat> modes;   // PrPixelFormat_Any allowed
     bool        colorspace_set = true;
     std::string colorspace     = kPrWorkingColorSpace;
+    bool        sei            = false;   // colorspace names an sei: preset
+    prSEIColorCodesRec sei_codes;
     CsEncoding  encoding       = CsEncoding::Both;
     int         latency_frames = 0;
 };
@@ -199,6 +205,21 @@ Config load_config() {
         } else if (key == "colorspace") {
             if (val == "unset")        { c.colorspace_set = false; }
             else if (val == "working") { c.colorspace_set = true; c.colorspace = kPrWorkingColorSpace; }
+            else if (val.rfind("sei:", 0) == 0) {
+                using P = PrColorPrimaries; using T = PrTransferCharacteristic; using M = PrMatrixEquations;
+                const std::string k = val.substr(4);
+                P pr = P::kBT709; T tr = T::kBT709;
+                if (k == "pq2020")    { pr = P::kBT2020; tr = T::kBT2100PQ; }
+                else if (k == "srgb") { pr = P::kBT709;  tr = T::kIEC61966_2_1; }
+                else if (k != "709")  logf("config: unknown sei preset '%s', using 709", k.c_str());
+                c.colorspace_set = true; c.sei = true; c.colorspace = val;
+                c.sei_codes.colorPrimariesCode         = static_cast<csSDK_int32>(pr);
+                c.sei_codes.transferCharacteristicCode = static_cast<csSDK_int32>(tr);
+                c.sei_codes.matrixEquationsCode        = static_cast<csSDK_int32>(M::kBT709);
+                c.sei_codes.bitDepth                   = static_cast<csSDK_int32>(PrEncodingBitDepth::k32f);
+                c.sei_codes.isFullRange                = kPrTrue;
+                c.sei_codes.isRGB                      = kPrTrue;
+            }
             else                       { c.colorspace_set = true; c.colorspace = val; }
         } else if (key == "cs_encoding") {
             c.encoding = val == "buffer" ? CsEncoding::Buffer
@@ -402,7 +423,10 @@ tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance* inst, csSDK_int3
         // Only the fields we own. inPrivateData is the host's; an unset
         // colour space leaves the record exactly as the host handed it over,
         // so the "unset" control really is the host default.
-        if (P->cfg.colorspace_set) {
+        if (P->cfg.colorspace_set && P->cfg.sei) {
+            out->outColorSpaceRec.outColorSpaceType = kPrSDKColorSpaceType_SEITags;
+            out->outColorSpaceRec.outSEICodesRec    = P->cfg.sei_codes;
+        } else if (P->cfg.colorspace_set) {
             ColorSpaceRec& cs = out->outColorSpaceRec;
             cs.outColorSpaceType = kPrSDKColorSpaceType_Predefined;
             cs.ioProfileRec.ioBufferSize        = 0;

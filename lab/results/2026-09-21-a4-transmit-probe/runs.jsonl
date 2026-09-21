@@ -1,2 +1,10 @@
 {"run":"baseline-all-tiers","project_bpc":8,"cms":"adobe","working_space":"none","offered":["argb8","argb16","argb32f","bgra8","bgra16","bgra32f"],"colorspace":"Working Color Space","delivered":"bgra32f","rowbytes":20480,"orientation":"bottom-up","alpha":"flattened opaque","greys_f":[0.149020,0.349020,0.600000,0.949020,0.749020,0.101961],"half50_rgba":[0.4,0.2,0.101961,1.0]}
 {"run":"argb8-only","project_bpc":8,"cms":"adobe","working_space":"none","offered":["argb8"],"colorspace":"Working Color Space","delivered":"argb8","rowbytes":5120,"orientation":"bottom-up","alpha":"flattened opaque","greys_u8":[38,89,153,242,191,26],"half50_argb":[255,102,51,26]}
+{"run":"R1","project_bpc":32,"cms":"ocio","config":"custom scene-linear rec2020","offered":["argb32f"],"colorspace":"Working Color Space","encoding":"both","delivered":"argb32f","values":"exact","greys":[0.15,0.35,0.6,0.95,0.75,0.1],"red":[1,0,0],"half50_rgba":[0.4,0.2,0.1,1.0]}
+{"run":"R2","project_bpc":32,"cms":"ocio","offered":["argb32f"],"colorspace":"unset","delivered":"argb32f","values":"identical to R1"}
+{"run":"R3","project_bpc":32,"cms":"ocio","offered":["argb32f_linear"],"colorspace":"Working Color Space","delivered":"argb32f_linear","values":"x^2.4","greys":[0.010535,0.080494,0.29347,0.884172,0.501357,0.003981],"red":[1,0,0],"half50_rgb":[0.110903,0.021012,0.003981]}
+{"run":"R4","project_bpc":32,"cms":"ocio","offered":["argb8","argb16","argb32f","bgra8","bgra16","bgra32f"],"colorspace":"Working Color Space","delivered":"bgra32f","values":"identical to R1"}
+{"run":"R5","project_bpc":32,"cms":"ocio","offered":["argb32f"],"colorspace":"sRGB","encoding":"both","delivered":"argb32f","values":"identical to R1"}
+{"run":"R6","project_bpc":32,"cms":"ocio","offered":["argb32f"],"colorspace":"BT.2020 RGB Full","encoding":"both","delivered":"argb32f","values":"identical to R1"}
+{"run":"R7","project_bpc":32,"cms":"ocio","offered":["argb32f"],"colorspace":"sRGB","encoding":"buffer","delivered":"argb32f","values":"identical to R1"}
+{"run":"R8","project_bpc":32,"cms":"ocio","offered":["argb32f"],"colorspace":"sRGB","encoding":"name","delivered":"argb32f","values":"identical to R1"}

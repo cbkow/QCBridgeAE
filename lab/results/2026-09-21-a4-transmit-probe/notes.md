@@ -78,6 +78,49 @@ the next thing to test.
   module's destructor after the new one created it. Fixed in the probe by
   owning the ring at file scope; A6 must do the same.
 
+## 6. Under OCIO, AE ignores the colour-space request — and delivers working space anyway
+
+Project switched by hand to **OCIO, 32 bpc**, a custom scene-linear
+Rec.2020-primaries config. (`app.project.workingSpace` reads `None` under this
+config — the OCIO working space is not visible to scripting here, unlike A2b's
+ACES config which reported `ACEScg`.) Same comp, solids typed as before.
+
+| Run | Offered | Colour space requested | Delivered | Values |
+| --- | --- | --- | --- | --- |
+| R1 | argb32f | `Working Color Space` (predefined) | argb32f | **exact as typed** |
+| R2 | argb32f | unset (host default, "BT.709 full 32f") | argb32f | identical to R1 |
+| R3 | argb32f_linear | working | argb32f_linear | **every value x^2.4** |
+| R4 | all six | working | **bgra32f** | identical to R1 |
+| R5 | argb32f | `sRGB`, both fields | argb32f | identical to R1 |
+| R6 | argb32f | `BT.2020 RGB Full`, both fields | argb32f | identical to R1 |
+| R7 | argb32f | `sRGB`, buffer field only | argb32f | identical to R1 |
+| R8 | argb32f | `sRGB`, name field only | argb32f | identical to R1 |
+
+"Exact as typed": 0.150000 / 0.350000 / 0.600000 / 0.950000 / 0.750000 /
+0.100000, red (1, 0, 0). The red primary is the telling sample: a working →
+Rec.709 conversion from Rec.2020 primaries would have produced roughly
+(1.66, −0.12, −0.02).
+
+**What it means.** Every colour-space request — including sRGB, which would
+re-encode every value — leaves the pixels untouched. Either AE ignores
+`outColorSpaceRec` under OCIO, or our predefined-name encoding is wrong. The
+outcome is the one we want (working space, untransformed, as A2b found for
+the AEGP), but it is not *because* of what we asked for, so it cannot be
+relied on as a mechanism yet. Next control: the SEI-tag form (the only
+encoding Adobe's sample shows) requesting PQ/Rec.2020. If that moves the
+numbers, our predefined encoding is at fault; if not, AE ignores the record.
+
+**The instrument can see a host transform.** R3's `_Linear` is exactly
+x^2.4 (0.15 → 0.010535, 0.95 → 0.884172, 0.4 → 0.110903) — the project's
+`workingGamma` of 2.4, not the 2.2 Adobe's guide states — applied even though
+this OCIO working space is already linear. `_Linear` is a real, wrong-for-us
+transform; never offer it.
+
+**Format preference holds at 32 bpc:** offered everything, AE again chose
+bgra32f (R4), matching the 8 bpc result.
+
+**Alpha still flattened at 32f:** the 50% solid is (0.4, 0.2, 0.1, 1.0).
+
 ## Next
 
 Formats: argb8+bgra8 only, and depth at 16/32 bpc. Colour: working space set
