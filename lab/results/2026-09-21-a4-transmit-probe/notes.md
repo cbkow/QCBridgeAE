@@ -121,8 +121,55 @@ bgra32f (R4), matching the 8 bpc result.
 
 **Alpha still flattened at 32f:** the 50% solid is (0.4, 0.2, 0.1, 1.0).
 
+## 7. Under Adobe CMS the request matters — and only one field, one way, works
+
+Project switched by hand to **Adobe CMS, 16 bpc, working space sRGB
+IEC61966-2.1**. Same comp.
+
+| Run | Offered | Encoding | Picked | Result |
+| --- | --- | --- | --- | --- |
+| R9 / R9b | argb32f | both | argb32f | **untouched** (0.149994 = 4915/32768, red 1,0,0) |
+| R10 | argb32f | unset | argb32f | **converted**: 0.15 → 0.194301, red → (1.000002, 0.003617, −0.005072) |
+| R11 | all six | both | bgra32f | converted (same values as R10) |
+| R12 | argb16 | both | argb16 | untouched: 4915 / 11469 / 31130 / 3277, red 32768 — A2's table exactly |
+| R13 | bgra32f | both | bgra32f | untouched |
+| R14 | argb32f, bgra32f | both | bgra32f | converted |
+| R15 | argb8, argb16, argb32f | both | argb32f | converted |
+| R16 | argb32f, bgra32f | buffer | bgra32f | converted |
+| R17 | argb32f, bgra32f | name | bgra32f | converted |
+| R18 | argb32f | **buffer** | argb32f | **converted** |
+| R19 | argb32f | **name** | argb32f | **untouched** |
+
+**Under Adobe CMS the default is a conversion.** Unset means Adobe's
+"BT.709 full range 32f", and the pixels change. D5's "always request working
+space, never leave it unset" is doing real work here, not just insurance.
+
+**AE reads `ioProfileRec.outName`** (a `PrSDKString`), not the raw
+`inDestinationBuffer`: buffer-only converts even with a single mode (R18),
+name-only is untouched (R19). This is the encoding the SDK never shows.
+
+**With more than one mode, the request was lost** — whichever mode AE picked,
+whatever the encoding (R11, R14–R17). Hypothesis: the probe handed the *same*
+`PrSDKString` to every mode, and the host takes ownership of what it reads,
+so every mode after the first carried a spent handle and AE fell back to its
+default. `PrSDKTransmit.h` states that contract for the audio output names
+("allocated by the plug-in and NOT be disposed by the plug-in"). The probe
+now allocates a fresh string per mode and never disposes them; **to be
+confirmed after the next AE restart.** If it does not fix multi-mode, the
+host honours the colour space only for a single offered mode, and the device
+must offer one mode.
+
+**Format choice at 16 bpc:** offered all six, AE picked bgra32f (R11) — the
+third project depth with the same answer. Offered argb16 alone, it delivered
+argb16, bit-exact.
+
+**Under OCIO (section 6) none of this showed**: there, every request was
+ignored and the pixels were untouched. Under Adobe CMS the request is live.
+The device has to be right for both.
+
 ## Next
 
-Formats: argb8+bgra8 only, and depth at 16/32 bpc. Colour: working space set
-under Adobe CMS, then OCIO/ACEScg, plus the unset and `_Linear` controls.
-Background preference. Comp background colour. Playback timing.
+After an AE restart with the new build: confirm per-mode strings fix
+multi-mode (repeat R14/R15), and re-check OCIO with the fixed build. Then:
+the SEI-tag control, background preference, comp background colour,
+playback timing, and Premiere.

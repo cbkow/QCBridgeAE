@@ -26,8 +26,8 @@
 //                 encoding Adobe's sample demonstrates; a control for whether
 //                 the host reads the colour-space record at all
 //   cs_encoding = both | buffer | name   — how a predefined name is passed.
-//                 The SDK documents the token but no sample fills one, so
-//                 which field the host reads is itself an A4 question.
+//                 Measured (A4, Adobe CMS): AE reads the PrSDKString in
+//                 ioProfileRec.outName; the raw buffer alone is ignored.
 //   latency     = 0   (frames of preroll the host sends ahead of playback)
 //
 // Privacy: the host gives a Transmit device no project paths or comp names,
@@ -262,8 +262,6 @@ struct Plugin {
 
     Config           cfg;
     time_t           cfg_mtime = 0;
-    PrSDKString      cs_name {};       // allocated for cs_encoding name/both
-    bool             cs_name_valid = false;
 };
 
 struct Instance {
@@ -341,7 +339,6 @@ tmResult Shutdown(tmStdParms* sp) {
     return guarded("Shutdown", [&] {
         Plugin* P = plugin(sp);
         if (P == nullptr) return tmResult_Success;
-        if (P->cs_name_valid && P->str != nullptr) P->str->DisposeString(&P->cs_name);
         if (P->ppix) P->sp->ReleaseSuite(kPrSDKPPixSuite,   kPrSDKPPixSuiteVersion);
         if (P->time) P->sp->ReleaseSuite(kPrSDKTimeSuite,   kPrSDKTimeSuiteVersion);
         if (P->str)  P->sp->ReleaseSuite(kPrSDKStringSuite, kPrSDKStringSuiteVersion);
@@ -436,12 +433,18 @@ tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance* inst, csSDK_int3
                 cs.ioProfileRec.inDestinationBuffer = const_cast<char*>(P->cfg.colorspace.c_str());
                 cs.ioProfileRec.ioBufferSize        = static_cast<csSDK_int32>(P->cfg.colorspace.size() + 1);
             }
+            // A fresh string for every mode, never disposed by us. The host
+            // takes ownership of what it reads: with one string shared across
+            // modes, every mode after the first carried a spent handle and AE
+            // fell back to its default Rec.709 conversion (A4, R17). Same
+            // contract PrSDKTransmit.h states for the audio output names.
             if (P->cfg.encoding != CsEncoding::Buffer && P->str != nullptr) {
-                if (!P->cs_name_valid
-                    && P->str->AllocateFromUTF8(reinterpret_cast<const prUTF8Char*>(P->cfg.colorspace.c_str()),
-                                                &P->cs_name) == 0)
-                    P->cs_name_valid = true;
-                if (P->cs_name_valid) cs.ioProfileRec.outName = P->cs_name;
+                PrSDKString name {};
+                if (P->str->AllocateFromUTF8(reinterpret_cast<const prUTF8Char*>(P->cfg.colorspace.c_str()),
+                                             &name) == 0)
+                    cs.ioProfileRec.outName = name;
+                else
+                    logf("QueryVideoMode: could not allocate colour-space name");
             }
         }
 
