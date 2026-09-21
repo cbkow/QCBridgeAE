@@ -1,4 +1,4 @@
-# 2026-09-21 — A4: the Transmit probe, first contact (in progress)
+# 2026-09-21 — A4: the Transmit probe
 
 After Effects 2026 (26.5), macOS 26.7, Apple Silicon, Premiere Pro SDK 26.0.
 Probe: `src/transmit/qcbae_transmit.cpp`, installed in MediaCore, enabled by
@@ -266,8 +266,40 @@ Each viewer change pushes **two** frames ~3 ms apart (seen as ~300 fps
 "bursts" of 2 frames); cheap at this size, but the product should not treat
 the pair as two distinct frames to process expensively.
 
+## 13. Premiere Pro 2026 — the same bundle, different behaviour
+
+Same installed bundle, enabled by hand in Premiere's Settings → Playback.
+Clip: a generated 1280×720 PNG, untagged, same layout as the AE comp — six
+greys 38/89/153/242/191/26 on top, (255, 0, 0) bottom-left, (204, 102, 51)
+at 128/255 **straight** alpha bottom-right — on a sequence made from it.
+Offered argb32f, bgra32f in working space.
+
+**Loads and pushes (D6 holds).** Module load, one instance, both modes
+queried, frames pushed.
+
+**Same as AE:** picks **bgra32f**; values untouched — greys exact n/255
+(0.149020 = 38/255 …), red (1, 0, 0); rows **bottom-up** with positive
+rowbytes.
+
+**Different from AE:**
+- **Alpha is carried, straight.** Bottom-right reads (0.8, 0.4, 0.2),
+  **A = 0.501961** (128/255): the clip's own straight alpha, not flattened.
+  Matches QCView's straight-alpha assumption. So the device cannot assume
+  opaque — AE flattens, Premiere does not.
+- **Real timestamps.** Parked frames arrive as `playmode_Stopped` with a true
+  `inTime` (e.g. 355978022400 ticks = 1.401 s at 254016000000 ticks/s).
+- **Truthful instance.** `tmInstance` reports 1280×720, 29.97 fps, non-zero
+  timeline and play IDs — AE reported a 720×480 placeholder with zeros.
+- **Fractional resolution while scrubbing.** Scrub frames arrive at 640×360
+  (quality 1), parked frames at 1280×720 (quality 3). The probe rebuilt its
+  ring on every switch — four times in a few seconds. The product must size
+  the ring for full resolution and not rebuild on a size drop.
+- **Focus loss deactivated video** (event 3) when the user switched away.
+  Premiere's equivalent background preference: not yet checked.
+
 ## Next
 
-Remaining: playback timestamps (AE preview arrives as scrubbing with no
-time), and Premiere. The SEI-tag control is no longer needed — the colour
-question was settled without it.
+A4 is done for v1's purposes. Deliberately left: AE playback timestamps
+(AE preview arrives as scrubbing with no time; Premiere has real times) —
+only matters for A/B, which is out of v1. Premiere's background preference.
+The SEI-tag control is not needed: the colour question settled without it.

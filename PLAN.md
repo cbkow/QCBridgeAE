@@ -340,7 +340,7 @@ Transmit delivers.)*
 | --- | --- | --- |
 | **A1 Spine** ✅ | Shared-memory ring + sidecar + throwaway Metal viewer. No AE involved | ~~Synthetic frames land in the viewer; surfaces recycle without tearing~~ **Done 2026-09-20** — `lab/results/2026-09-20-a1-ring-spine/`, `-a1b-metal-probe/` |
 | **A2 AEGP tap** ✅ | AEGP plugin: render the active comp on idle, convert, publish. macOS | ~~A live AE comp appears in the probe viewer, bit-exact for 8bpc~~ **Done 2026-09-20** — bit-exact for 8 **and** 16 bpc, ICC sidecar live. `lab/results/2026-09-20-a2-aegp-tap/` |
-| **A4 Transmit probe** | Minimal Transmit device from the Premiere SDK sample, publishing into the existing ring. Logs every `QueryVideoMode` negotiation and every pushed frame's format, colour space, alpha and time | Recorded in `lab/results/`, under **both** AE and Premiere: **which offered format the host picks at each project depth** (8/16/32 bpc); whether `kPrWorkingColorSpace` delivers A2b's known-value solids untransformed under Adobe CMS **and** OCIO/ACEScg; premultiplied or straight; whether the stream survives AE losing focus; the 16u range suspicion (D1); shuffle-in-copy cost in `qcbae-convbench`. Go / no-go on Route A |
+| **A4 Transmit probe** ✅ | Minimal Transmit device from the Premiere SDK sample, publishing into the existing ring. Logs every `QueryVideoMode` negotiation and every pushed frame's format, colour space, alpha and time | Recorded in `lab/results/`, under **both** AE and Premiere: **which offered format the host picks at each project depth** (8/16/32 bpc); whether `kPrWorkingColorSpace` delivers A2b's known-value solids untransformed under Adobe CMS **and** OCIO/ACEScg; premultiplied or straight; whether the stream survives AE losing focus; the 16u range suspicion (D1); shuffle-in-copy cost in `qcbae-convbench`. Go / no-go on Route A |
 | **A6 Transmit plugin** | The real device: argb32f/bgra32f in working space (a fresh `PrSDKString` per mode), flipped, reordered and converted to `RGBA16F` in one pass (D1, D5). Ships Premiere support (D6) | Appears in Preferences → Video Preview in both apps; `qcbae-probe dump` matches the AEGP tap on the same comp |
 | **A3 QCView ingest** | Ring-reader live source in QCView (GPL, that repo), the 16F upload branch in both renderers, routing split from SRT. Single view only | Comp is live in QCView as a media item and follows AE; OCIO engaged by hand gives the expected picture; dropouts hold the last frame; bytes match `qcbae-probe dump` |
 | **A5 Windows parity** | Named file mapping (or D3D11 shared texture), MSVC build, F16C conversion, Transmit on Windows | Same A4/A6 checks pass on Windows |
@@ -395,11 +395,16 @@ governs the shared notes folder.
   unticks "Disable video output when in the background" (A4). Needs a setup
   step, and the device should flag the deactivation in the sidecar so QCView
   can tell the user why the feed froze. (A6 / A3)
-- ~~Premultiplied?~~ Moot for AE: frames arrive composited and opaque. Is it
-  the comp background or black? The comp background colour (A4). Premiere: check.
+- ~~Premultiplied?~~ AE flattens over the comp background colour and sends
+  opaque frames; **Premiere carries straight alpha** (A4). The device must
+  not assume opaque; QCView's straight-alpha path fits both.
 - What does AE push while idle? Observed: one frame per viewer change, as
   scrubbing with `inTime` −1; preview playback also arrives as scrubbing.
-  Is there ever a comp time to show? (A4)
+  Premiere sends real times; AE preview does not. Only matters for A/B
+  (out of v1). (A4)
+- Premiere scrubs at fractional resolution (640×360 for a 720p sequence), so
+  frame size changes constantly: the ring must be sized for full resolution
+  and never rebuilt on a size drop. (A6)
 - ~~Does "closest format" pick the project's depth?~~ No — AE always takes
   32f when offered; v1 takes 32f (D1).
 - 16u range handling — moot for v1 (D1); revisit only with an 8/16-bit
