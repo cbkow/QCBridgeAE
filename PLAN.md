@@ -374,8 +374,8 @@ Transmit delivers.)*
 Everything through A6 builds on macOS with what is in `private/sdk/`. A3 needs
 QCView-Player checked out alongside.
 
-**The A3 cold-pickup plan (`PLAN-A3.md`) was lost with the original machine**
-before it was committed. This table and §QCView ingest replace it. Plans get
+**`PLAN-A3.md`** is the A3 plan (rewritten and approved 2026-09-21, after the
+first one was lost uncommitted with the original machine). Plans get
 committed.
 
 ## Privacy and licensing
