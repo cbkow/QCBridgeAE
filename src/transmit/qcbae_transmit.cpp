@@ -23,8 +23,12 @@
 //     module before shutting down the old (A4 section "Also observed").
 //   * Host state goes in the ring header, so QCView can explain a freeze —
 //     above all the focus-loss pause AE applies by default (A4 section 12).
-//   * Each viewer change pushes two frames ~3 ms apart. A frame whose PPix
-//     unique key matches the last one published is not converted again.
+//   * Every pushed frame is converted. An earlier version silently skipped a
+//     frame whose PPix unique key matched the last one (each viewer change
+//     pushes two frames ~3 ms apart). In AE it published one frame and then
+//     nothing: removing it alone brought AE back to 24 fps at 4K (A6 notes),
+//     so the key does not identify content there. An unmeasured saving must
+//     not be able to drop frames without a trace.
 //
 // Privacy: a Transmit device receives no project paths or comp names; the
 // only label published is the host's name (PLAN.md §Privacy 5, 6).
@@ -97,8 +101,8 @@ struct Ring {
     SharedRing ring;
     uint64_t   capacity = 0;   // bytes per slot
     Host       host {};
-    uint64_t   published = 0, skipped_duplicates = 0;
-    std::vector<unsigned char> last_key;
+    uint64_t   published = 0;
+    uint32_t   last_w = 0, last_h = 0;
 
     // Host state is derived, not last-writer-wins. AE creates and discards
     // an instance for every item it touches while opening a project (seen in
@@ -122,8 +126,7 @@ void publish_state() {
 void retire_ring(const char* why) {
     if (!S.ring.valid()) return;
     S.ring.set_host_state(HostState::Retired);
-    logf("ring retired (%s) after %llu frames, %llu duplicates skipped", why,
-         (unsigned long long)S.published, (unsigned long long)S.skipped_duplicates);
+    logf("ring retired (%s) after %llu frames", why, (unsigned long long)S.published);
     S.ring = SharedRing();
     S.capacity = 0;
 }
@@ -147,7 +150,6 @@ struct Plugin {
     PrSDKTimeSuite*   time = nullptr;
     PrSDKStringSuite* str  = nullptr;
     PrTime            ticks_per_second = 0;
-    size_t            key_size = 0;
 };
 
 Plugin* plugin(const tmStdParms* sp) { return static_cast<Plugin*>(sp->ioPrivatePluginData); }
@@ -182,7 +184,6 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
         acquire(P->sp, kPrSDKTimeSuite,   kPrSDKTimeSuiteVersion,   &P->time);
         acquire(P->sp, kPrSDKStringSuite, kPrSDKStringSuiteVersion, &P->str);
         if (P->time != nullptr) P->time->GetTicksPerSecond(&P->ticks_per_second);
-        if (P->ppix != nullptr && P->ppix->GetUniqueKeySize(&P->key_size) != 0) P->key_size = 0;
         if (S.host.ring == nullptr) S.host = detect_host();
         logf("startup in %s: ring %s, ticks/s %lld", S.host.label, S.host.ring,
              static_cast<long long>(P->ticks_per_second));
@@ -292,17 +293,6 @@ tmResult ActivateDeactivate(const tmStdParms*, const tmInstance* inst, PrActivat
 }
 
 void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
-    // The pair a viewer change pushes: identical key, identical pixels.
-    if (P->key_size > 0) {
-        std::vector<unsigned char> key(P->key_size);
-        if (P->ppix->GetUniqueKey(h, key.data(), key.size()) == 0) {
-            if (key == S.last_key) { ++S.skipped_duplicates; return; }
-            S.last_key = std::move(key);
-        } else {
-            S.last_key.clear();
-        }
-    }
-
     PrPixelFormat pf = PrPixelFormat_Invalid;
     prRect bounds {};
     csSDK_int32 rowbytes = 0;
@@ -350,11 +340,14 @@ void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
     S.ring.commit(d);
     publish_state();   // a new ring starts Active (zeroed); make it tell the truth
 
-    if (++S.published == 1 || (S.published % 500) == 0 || cr.has_inf || cr.has_nan)
-        logf("published %llu (%ux%u %s%s%s), %llu duplicates skipped", (unsigned long long)S.published,
+    // Logged on the first frame, every size change, every 240th frame and any
+    // non-finite frame — enough to see frames flowing without a line each.
+    const bool resized = uw != S.last_w || uh != S.last_h;
+    S.last_w = uw; S.last_h = uh;
+    if (++S.published == 1 || resized || (S.published % 240) == 0 || cr.has_inf || cr.has_nan)
+        logf("published %llu (%ux%u %s%s%s)", (unsigned long long)S.published,
              uw, uh, order == HostOrder::ARGB ? "ARGB" : "BGRA",
-             cr.has_inf ? ", has inf" : "", cr.has_nan ? ", has NaN" : "",
-             (unsigned long long)S.skipped_duplicates);
+             cr.has_inf ? ", has inf" : "", cr.has_nan ? ", has NaN" : "");
 }
 
 tmResult PushVideo(const tmStdParms* sp, const tmInstance*, const tmPushVideo* pv) {

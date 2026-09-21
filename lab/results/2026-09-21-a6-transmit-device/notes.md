@@ -59,3 +59,45 @@ Product installed in place of the probe (same bundle filename, new GUID).
   "paused: focus". The producer cannot fix this; **a consumer must treat a
   ring whose `producer_pid` is dead as offline, before looking at
   `host_state`.** `qcbae-probe dump` does (it flagged exactly this case).
+
+## Premiere alongside AE, and a frame-dropping optimisation
+
+Premiere opened with the product enabled while AE was running:
+
+- **Two rings, no collision.** `/qcbae-premiere` and `/qcbae-ae` each hold
+  their own host's frame. Premiere: orientation correct, straight alpha
+  carried (0.7998, 0.3999, 0.2000, **A 0.501953** = nearest half of 128/255),
+  real time (1.6016 s), label "Premiere Pro".
+- **Premiere has the same background preference.** Before it was unticked,
+  every focus loss sent event 3 and the ring read "paused: host lost focus";
+  after, Premiere stayed active in the background. Both apps need the same
+  setup step.
+
+**AE then went silent** — an active 4K instance, AE busy, nothing pushed into
+the ring during playback or scrubbing. Two explanations were on the table:
+output ownership between apps (Chris: AJA and Blackmagic behave that way),
+or the device's own frame skipping, which dropped any frame whose PPix unique
+key matched the last one — silently; skips were logged only every 500 frames.
+
+Discriminating run: the skip removed, AE restarted, **Premiere still open**.
+AE pushed every frame — 3 scrubbed 4K frames, then playback. **The cause was
+the skip.** In AE the unique key evidently does not identify content, so
+every frame after the first was discarded as a "duplicate". It was an
+unmeasured saving that could drop frames without a trace, and is gone. (AE
+and Premiere *can* both transmit to this device at once — unlike the
+hardware devices Chris has seen.)
+
+## 4K playback through the device
+
+AE, the 8 bpc 4K comp, cached preview playback, Premiere also open, two runs:
+
+| | fps into the ring | AE CPU |
+| --- | ---: | ---: |
+| run 1 | 24.09 | 0.57 cores |
+| run 2 | 23.97 | 0.56 cores |
+
+Real time, and AE's CPU matches the A4 baseline for plain 8u delivery
+(0.57) — the 2.3 ms conversion on the push thread is lost in the noise.
+Values are the exact nearest halves: mover (0.9, 0.6, 0.1) → 0.901855 /
+0.600098 / 0.101990; background (0.2, 0.3, 0.4) → 0.199951 / 0.302002 /
+0.399902.
