@@ -220,9 +220,18 @@ time_t config_mtime() {
 }
 
 // --- module state ------------------------------------------------------------
-// One ring for the module: the probe watches one ring name, and A4 only ever
-// needs one active instance. Frames from a second instance would overwrite
-// the first; each frame's log line carries its instance id so that shows.
+// The ring lives at file scope, not in Plugin, and outlives module resets.
+// A NeedsReset runs Startup for the new plugin BEFORE Shutdown of the old
+// (seen in the A4 log), and a ring's destructor unlinks its name — so a ring
+// owned by the old Plugin could unlink the name the new one had just created,
+// leaving a producer publishing into a mapping no consumer can open. One ring
+// per process avoids the race outright.
+//
+// Frames from a second instance would overwrite the first; each frame's log
+// line carries its instance id so that shows.
+SharedRing S_ring;
+uint32_t   S_ring_w = 0, S_ring_h = 0;
+
 struct Plugin {
     SPBasicSuite*    sp     = nullptr;
     PrSDKPPixSuite*  ppix   = nullptr;
@@ -234,9 +243,6 @@ struct Plugin {
     time_t           cfg_mtime = 0;
     PrSDKString      cs_name {};       // allocated for cs_encoding name/both
     bool             cs_name_valid = false;
-
-    SharedRing       ring;
-    uint32_t         ring_w = 0, ring_h = 0;
 };
 
 struct Instance {
@@ -474,13 +480,13 @@ void publish(Plugin* P, Instance* I, const tmInstance* inst, const tmPushVideo* 
     const auto uw = static_cast<uint32_t>(w), uh = static_cast<uint32_t>(hgt);
     // Sized for native 32f (16 B/px), the widest thing the probe carries, so
     // a tier change never needs a rebuild — only a geometry change does.
-    if (!P->ring.valid() || P->ring_w != uw || P->ring_h != uh) {
-        P->ring = SharedRing();
-        if (P->ring.create(kRingName, frame_bytes(uw, uh, PixelFormat::RGBA32Float))) {
-            P->ring_w = uw; P->ring_h = uh;
+    if (!S_ring.valid() || S_ring_w != uw || S_ring_h != uh) {
+        S_ring = SharedRing();
+        if (S_ring.create(kRingName, frame_bytes(uw, uh, PixelFormat::RGBA32Float))) {
+            S_ring_w = uw; S_ring_h = uh;
             logf("ring created for %ux%u", uw, uh);
         } else {
-            logf("ring create failed: %s", P->ring.error().c_str());
+            logf("ring create failed: %s", S_ring.error().c_str());
             return;
         }
     }
@@ -492,7 +498,7 @@ void publish(Plugin* P, Instance* I, const tmInstance* inst, const tmPushVideo* 
         logf("rowbytes %d shorter than a %zu-byte row; frame skipped", rowbytes, tight);
         return;
     }
-    auto* dst = static_cast<uint8_t*>(P->ring.begin_write(static_cast<uint64_t>(dst_row) * uh));
+    auto* dst = static_cast<uint8_t*>(S_ring.begin_write(static_cast<uint64_t>(dst_row) * uh));
     if (dst == nullptr) { logf("begin_write refused %ux%u", uw, uh); return; }
     for (uint32_t y = 0; y < uh; ++y)
         std::memcpy(dst + static_cast<size_t>(y) * dst_row,
@@ -510,7 +516,7 @@ void publish(Plugin* P, Instance* I, const tmInstance* inst, const tmPushVideo* 
     d.time_scale    = P->ticks_per_second;
     d.value_scale   = fi->tier == SourceTier::Int16 ? kAE16ValueScale : 1.0f;
     std::snprintf(d.comp_name, sizeof d.comp_name, "%s", fi->token);   // no comp name reaches a Transmit device
-    P->ring.commit(d);
+    S_ring.commit(d);
 }
 
 tmResult PushVideo(const tmStdParms* sp, const tmInstance* inst, const tmPushVideo* pv) {
