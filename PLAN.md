@@ -75,18 +75,44 @@ it is a flag rather than a rewrite.
 The x86 equivalent is F16C `_mm256_cvtps_ph`, available since 2012. The integer
 tiers sidestep the question entirely by never converting.
 
-**Under Transmit, v1 carries one format: `RGBA16F`.** *(2026-09-21, pending
-A4.)* The per-tier table above was measured on the AEGP tap, where we chose the
-world type. A Transmit device instead *asks* the host for a pixel format, and
-QCView's floor turned out to be 16F everywhere (§QCView ingest): every source
-is resampled into an `RGBA16F` canvas before OCIO sees it, so 16u's extra bits
-die at QCView's first render target whatever the wire carries. The plan for v1:
-request 32f in the working space (D5), and have the plugin convert to half and
-reorder Premiere's BGRA to RGBA in the one pass that already touches every
-pixel. QCView then gets a single ingest path. Keeping 8 bpc native to halve
-the bytes remains possible later — it costs QCView a second path, and A4 will
-show whether AE even offers integer formats to a Transmit device. The ring's
-per-tier support stays built and tested either way.
+**Under Transmit: the host picks the tier, the copy does the work.**
+*(2026-09-21, pending A4. Briefly "v1 carries RGBA16F only" earlier the same
+day — withdrawn: requesting 32f for an 8 bpc project makes AE up-convert,
+costs us ~4× the CPU (2.67 vs 0.66 ms at 4K) and doubles the wire bytes, all
+to carry values that were exact in 8 bits.)* Speed and efficiency of the data
+path are the priority.
+
+- **Offer every tier; let the host choose.** `QueryVideoMode` offers
+  `ARGB_4444_{8u,16u,32f}` (AE's native order) then the same in BGRA
+  (Premiere's), all in the working colour space (D5). Per Adobe's guide the
+  host "chooses the best format to use on a per-segment basis" from that list,
+  so a project should arrive at its own depth with no host conversion. We read
+  `GetPixelFormat` per frame; the ring already switches tier mid-session (A2).
+  We cannot detect the depth ourselves anyway — a Transmit plugin has no AE
+  project suites, runs in Premiere too, and `tmInstance` carries no depth.
+  **A4 verifies "best" means what we need**; if AE always picks the deepest,
+  fall back to one tier per instance, re-queried via `NeedsReset`.
+- **One unavoidable copy, and all per-pixel work folded into it.** The host
+  owns the PPix, so host → ring is the floor. It is memory-bound, so a channel
+  shuffle (ARGB/BGRA → RGBA) inside it should be near-free — to be measured
+  in `qcbae-convbench`.
+
+| Host tier | In the copy | Ring | QCView CPU slot today |
+| --- | --- | --- | --- |
+| 8u | shuffle | `RGBA8Unorm` | accepted (`Format_RGBA8888`) |
+| 16u | shuffle; **maybe** a saturating ×2 (0..32768 → 0..65535) | `RGBA16Unorm` | accepted (`Format_RGBA64`), but no `value_scale` |
+| 32f | shuffle + hardware half conversion | `RGBA16F` | needs the new 16F branch |
+
+  The 16u shift is a **suspicion to test, not a decision**: it is injective
+  and lands within 1.5×10⁻⁵ of exact — ~60× finer than QCView's 16F floor —
+  and would spare QCView a scale uniform. Alternatives: keep `value_scale` and
+  add the uniform in QCView, or convert 16u to half (1.2× a memcpy, A1c).
+  Adobe's guide confirms Transmit 16u is 0..32768, like AE.
+- **Zero-copy where the hardware allows is QCView's half.** Its CPU slot
+  copies into its own texture (`replaceRegion`); on Apple Silicon a ring
+  reader can instead wrap the slot as a texture (A1b), making the whole path
+  host render → one write → GPU reads. Windows on a discrete GPU pays one
+  upload regardless.
 
 **D2 — Accepted precision losses, written down on purpose.**
 - 32f → 16f: 24-bit significand to 11-bit. Accepted (chris, 2026-09-20),
@@ -269,7 +295,11 @@ stride. Live status, reconnect and hold-last-frame-on-dropout come with it.
   `WindowManager::m_liveDecoder` is typed as the SRT class, so a small live-source
   base class comes out of `LiveStreamDecoder`.
 - Nothing downstream swizzles channels or applies a scale, so the plugin
-  delivers RGBA in 0..1-referenced float (D1's Transmit note).
+  delivers RGBA, and the 16u range question is settled in A4 (D1's Transmit
+  note). 8u and 16u already have CPU-slot formats; only 16F is new.
+- **For zero-copy on Apple Silicon**, the ring reader should wrap the slot as a
+  texture (A1b) rather than hand `replaceRegion` a `QImage` view. The
+  `cpuShared` route above is the quick first cut.
 
 **Facts that bound the design:**
 - **16F is QCView's floor.** The source is bilinear-resampled into a
@@ -307,8 +337,8 @@ Transmit delivers.)*
 | --- | --- | --- |
 | **A1 Spine** ✅ | Shared-memory ring + sidecar + throwaway Metal viewer. No AE involved | ~~Synthetic frames land in the viewer; surfaces recycle without tearing~~ **Done 2026-09-20** — `lab/results/2026-09-20-a1-ring-spine/`, `-a1b-metal-probe/` |
 | **A2 AEGP tap** ✅ | AEGP plugin: render the active comp on idle, convert, publish. macOS | ~~A live AE comp appears in the probe viewer, bit-exact for 8bpc~~ **Done 2026-09-20** — bit-exact for 8 **and** 16 bpc, ICC sidecar live. `lab/results/2026-09-20-a2-aegp-tap/` |
-| **A4 Transmit probe** | Minimal Transmit device from the Premiere SDK sample, publishing into the existing ring. Logs every `QueryVideoMode` negotiation and every pushed frame's format, colour space, alpha and time | Recorded in `lab/results/`, under **both** AE and Premiere: which pixel formats the host offers; whether `kPrWorkingColorSpace` delivers A2b's known-value solids untransformed under Adobe CMS **and** OCIO/ACEScg; premultiplied or straight; whether the stream survives AE losing focus. Go / no-go on Route A |
-| **A6 Transmit plugin** | The real device, if A4 is green: 32f in working space → `RGBA16F` RGBA into the ring, one pass. Ships Premiere support (D6) | Appears in Preferences → Video Preview in both apps; `qcbae-probe dump` matches the AEGP tap on the same comp |
+| **A4 Transmit probe** | Minimal Transmit device from the Premiere SDK sample, publishing into the existing ring. Logs every `QueryVideoMode` negotiation and every pushed frame's format, colour space, alpha and time | Recorded in `lab/results/`, under **both** AE and Premiere: **which offered format the host picks at each project depth** (8/16/32 bpc); whether `kPrWorkingColorSpace` delivers A2b's known-value solids untransformed under Adobe CMS **and** OCIO/ACEScg; premultiplied or straight; whether the stream survives AE losing focus; the 16u range suspicion (D1); shuffle-in-copy cost in `qcbae-convbench`. Go / no-go on Route A |
+| **A6 Transmit plugin** | The real device, if A4 is green: every tier offered in working space, host's pick → RGBA into the ring in one copy (D1). Ships Premiere support (D6) | Appears in Preferences → Video Preview in both apps; `qcbae-probe dump` matches the AEGP tap on the same comp |
 | **A3 QCView ingest** | Ring-reader live source in QCView (GPL, that repo), the 16F upload branch in both renderers, routing split from SRT. Single view only | Comp is live in QCView as a media item and follows AE; OCIO engaged by hand gives the expected picture; dropouts hold the last frame; bytes match `qcbae-probe dump` |
 | **A5 Windows parity** | Named file mapping (or D3D11 shared texture), MSVC build, F16C conversion, Transmit on Windows | Same A4/A6 checks pass on Windows |
 | **A7 Packaging** | Signing, notarization, installers both platforms | Installs clean on a machine that has never seen the SDK |
@@ -365,6 +395,8 @@ governs the shared notes folder.
 - What does AE push while idle — one frame per change, or nothing until
   playback? QCView holds the last frame either way, but a comp edit must
   arrive. (A4)
-- Is 8 bpc worth carrying natively later, to halve the bytes, at the cost of a
-  second ingest path in QCView? Not for v1.
+- Does "closest format" pick the project's own depth, or always the deepest
+  offered? (A4 — decides whether D1's per-tier Transmit design holds)
+- 16u: saturating shift in the copy, `value_scale` uniform in QCView, or
+  convert to half? (A4 measures; may prove unnecessary)
 - ~~Route B cadence~~ and ~~ICC → OCIO name~~: retired with D5 and D7.
