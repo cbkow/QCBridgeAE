@@ -1,37 +1,33 @@
-// QCBridgeAE — the Transmit probe (phase A4, Route A).
+// QCBridgeAE — the Mercury Transmit device (phase A6, Route A).
 //
-// A Mercury Transmit device that publishes whatever the host pushes into the
-// shared ring, unaltered, so qcbae-probe can read it back. It is an
-// instrument, not the product (that is A6): its job is to answer A4's
-// questions by measurement, and it may not change what it measures.
+// After Effects or Premiere pushes the frames it has already rendered; this
+// turns each into top-down RGBA16F in a shared ring QCView reads. Everything
+// here follows from what the A4 probe measured
+// (lab/results/2026-09-21-a4-transmit-probe/), and each rule says where:
 //
-// So, deliberately:
-//   * Pixels go in exactly as the host delivered them — native depth, native
-//     channel order, 32f as 32f. No shuffle, no half conversion, no range fix.
-//     The sidecar states what arrived (order, premultiplied, value_scale) and
-//     the probe's dump/viewer interpret it. Folding work into the copy is A6.
-//   * Every negotiation is logged: which modes we offered, what the host
-//     pre-filled, and per frame which format it actually picked.
-//   * What we offer is read from a config file, and re-read without
-//     restarting AE (NeedsReset), because A4 needs control conditions — an
-//     unset colour space, a _Linear format — that must visibly change the
-//     numbers. A result that no control can move proves nothing.
+//   * Offer ARGB_4444_32f then BGRA_4444_32f, nothing else (PLAN.md D1). The
+//     host prefers 32f whenever it is offered; offering an integer tier alone
+//     risks a 32 bpc project being clamped to 8 bits.
+//   * Request the working colour space in every mode, as a fresh PrSDKString
+//     in ioProfileRec.outName (D5; A4 sections 7-8). Under Adobe CMS an unset
+//     request means a conversion to Rec.709; the raw buffer field is ignored;
+//     and the host owns each string it reads, so one shared across modes left
+//     every mode after the first with a spent handle.
+//   * One pass: flip (frames arrive bottom-up with positive rowbytes), reorder
+//     to RGBA, IEEE convert to half — never clamp, flag inf/NaN (D4).
+//   * Straight alpha passes through: Premiere carries it, AE sends opaque.
+//   * The ring grows, never shrinks: Premiere scrubs at fractional resolution
+//     and the probe rebuilt its ring on every size switch (A4 section 13).
+//     Frame geometry is per frame in FrameDesc; the ring only needs room.
+//   * The ring is process-wide, not per module: a module reset starts the new
+//     module before shutting down the old (A4 section "Also observed").
+//   * Host state goes in the ring header, so QCView can explain a freeze —
+//     above all the focus-loss pause AE applies by default (A4 section 12).
+//   * Each viewer change pushes two frames ~3 ms apart. A frame whose PPix
+//     unique key matches the last one published is not converted again.
 //
-// Config: /tmp/qcbridgeae-transmit.conf, key = value, '#' comments. All keys
-// optional; defaults are the design in PLAN.md D1/D5.
-//   modes       = argb8, argb16, argb32f, bgra8, bgra16, bgra32f
-//                 (also *32f_linear, prgb*, bgrp*, xrgb*, bgrx*, any)
-//   colorspace  = working | unset | <a predefined name, e.g. BT.709 RGB Full (Scene)>
-//                 | sei:pq2020 | sei:srgb | sei:709   — SEI-tag form, the only
-//                 encoding Adobe's sample demonstrates; a control for whether
-//                 the host reads the colour-space record at all
-//   cs_encoding = both | buffer | name   — how a predefined name is passed.
-//                 Measured (A4, Adobe CMS): AE reads the PrSDKString in
-//                 ioProfileRec.outName; the raw buffer alone is ignored.
-//   latency     = 0   (frames of preroll the host sends ahead of playback)
-//
-// Privacy: the host gives a Transmit device no project paths or comp names,
-// and nothing here asks for them (PLAN.md §Privacy 5, 6).
+// Privacy: a Transmit device receives no project paths or comp names; the
+// only label published is the host's name (PLAN.md §Privacy 5, 6).
 
 #include "PrSDKTransmit.h"
 #include "PrSDKPPixSuite.h"
@@ -40,18 +36,17 @@
 #include "PrSDKPixelFormat.h"
 #include "PrSDKColorSpaces.h"
 #include "PrSDKColorProfile.h"
-#include "PrSDKColorSEICodes.h"
 #include "SPBasic.h"
 
+#include "common/convert/half_convert.h"
 #include "common/surface/shared_ring.h"
-
-#include <sys/stat.h>
 
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -59,17 +54,25 @@ using namespace qcbae;
 
 namespace {
 
-constexpr const char* kRingName   = "/qcbae-probe";   // what qcbae-probe opens
-constexpr const char* kConfigPath = "/tmp/qcbridgeae-transmit.conf";
-constexpr const char* kLogPath    = "/tmp/qcbridgeae-transmit.log";
+constexpr const char* kLogPath = "/tmp/qcbridgeae-transmit.log";
 
-// Persistent identity in the host's device list. Generated once; never change
-// it, or the host treats the device as new and forgets the user's choice.
-constexpr const char* kPluginGUID = "66728618-5F5B-40FF-89A5-DAD8CB7C7DB6";
+// Persistent identity in the host's device list. Never change it, or the host
+// treats the device as new and forgets the user's choice. (The A4 probe has
+// its own.)
+constexpr const char* kPluginGUID = "1BB013B9-952D-4D6C-B35E-1E0EF3F52CA8";
+
+// Which host we are in decides the ring name (PLAN.md A6: one fixed name per
+// host, so AE and Premiere running together do not overwrite each other).
+struct Host { const char* ring; const char* label; };
+
+Host detect_host() {
+    const char* prog = getprogname();
+    const std::string p = prog != nullptr ? prog : "";
+    if (p.find("Premiere") != std::string::npos) return {kRingNamePremiere, "Premiere Pro"};
+    return {kRingNameAfterEffects, "After Effects"};   // AE, or an unknown MediaCore host
+}
 
 // --- logging ---------------------------------------------------------------
-// Appended, not truncated: NeedsReset restarts the module mid-session and the
-// negotiation before a reset is exactly what we want to keep.
 FILE* S_log = nullptr;
 
 void logf(const char* fmt, ...) {
@@ -88,244 +91,59 @@ void logf(const char* fmt, ...) {
     std::fflush(S_log);
 }
 
-std::string fourcc(PrPixelFormat pf) {
-    const auto v = static_cast<uint32_t>(pf);
-    std::string s;
-    for (int i = 0; i < 4; ++i) {
-        const char c = static_cast<char>((v >> (8 * i)) & 0xFF);
-        s.push_back(c >= 32 && c < 127 ? c : '?');
+// --- the ring: process-wide, grow-only --------------------------------------
+struct Ring {
+    SharedRing ring;
+    uint64_t   capacity = 0;   // bytes per slot
+    Host       host {};
+    uint64_t   published = 0, skipped_duplicates = 0;
+    std::vector<unsigned char> last_key;
+};
+Ring S;
+
+// Replacing a mapping tells whoever holds the old one to let go first.
+void retire_ring(const char* why) {
+    if (!S.ring.valid()) return;
+    S.ring.set_host_state(HostState::Retired);
+    logf("ring retired (%s) after %llu frames, %llu duplicates skipped", why,
+         (unsigned long long)S.published, (unsigned long long)S.skipped_duplicates);
+    S.ring = SharedRing();
+    S.capacity = 0;
+}
+
+bool ensure_capacity(uint64_t bytes) {
+    if (S.ring.valid() && bytes <= S.capacity) return true;
+    retire_ring("needs more room");
+    if (!S.ring.create(S.host.ring, bytes)) {
+        logf("ring create failed: %s", S.ring.error().c_str());
+        return false;
     }
-    return s;
-}
-
-// --- the formats we understand ----------------------------------------------
-// Everything a host can hand a 4:4:4:4 RGB device. The letters are the byte
-// order in memory: ARGB is AE native, BGRA Premiere native. P = premultiplied
-// alpha, X = alpha implicitly opaque and "may be left filled with garbage"
-// (Adobe's guide). _Linear is a *host transform* — "gamma of 1, rather than
-// the standard 2.2" — offered only as a control, never by default.
-struct FormatInfo {
-    const char*  token;
-    PrPixelFormat pf;
-    PixelFormat  wire;
-    SourceTier   tier;
-    ChannelOrder order;
-    bool         premultiplied;
-    bool         opaque_x;
-    bool         linear;
-};
-
-const FormatInfo kFormats[] = {
-    {"argb8",   PrPixelFormat_ARGB_4444_8u,  PixelFormat::RGBA8Unorm,  SourceTier::Int8,    ChannelOrder::ARGB, false, false, false},
-    {"argb16",  PrPixelFormat_ARGB_4444_16u, PixelFormat::RGBA16Unorm, SourceTier::Int16,   ChannelOrder::ARGB, false, false, false},
-    {"argb32f", PrPixelFormat_ARGB_4444_32f, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::ARGB, false, false, false},
-    {"bgra8",   PrPixelFormat_BGRA_4444_8u,  PixelFormat::RGBA8Unorm,  SourceTier::Int8,    ChannelOrder::BGRA, false, false, false},
-    {"bgra16",  PrPixelFormat_BGRA_4444_16u, PixelFormat::RGBA16Unorm, SourceTier::Int16,   ChannelOrder::BGRA, false, false, false},
-    {"bgra32f", PrPixelFormat_BGRA_4444_32f, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::BGRA, false, false, false},
-
-    {"argb32f_linear", PrPixelFormat_ARGB_4444_32f_Linear, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::ARGB, false, false, true},
-    {"bgra32f_linear", PrPixelFormat_BGRA_4444_32f_Linear, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::BGRA, false, false, true},
-
-    {"prgb8",   PrPixelFormat_PRGB_4444_8u,  PixelFormat::RGBA8Unorm,  SourceTier::Int8,    ChannelOrder::ARGB, true,  false, false},
-    {"prgb16",  PrPixelFormat_PRGB_4444_16u, PixelFormat::RGBA16Unorm, SourceTier::Int16,   ChannelOrder::ARGB, true,  false, false},
-    {"prgb32f", PrPixelFormat_PRGB_4444_32f, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::ARGB, true,  false, false},
-    {"bgrp8",   PrPixelFormat_BGRP_4444_8u,  PixelFormat::RGBA8Unorm,  SourceTier::Int8,    ChannelOrder::BGRA, true,  false, false},
-    {"bgrp16",  PrPixelFormat_BGRP_4444_16u, PixelFormat::RGBA16Unorm, SourceTier::Int16,   ChannelOrder::BGRA, true,  false, false},
-    {"bgrp32f", PrPixelFormat_BGRP_4444_32f, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::BGRA, true,  false, false},
-    {"prgb32f_linear", PrPixelFormat_PRGB_4444_32f_Linear, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::ARGB, true, false, true},
-    {"bgrp32f_linear", PrPixelFormat_BGRP_4444_32f_Linear, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::BGRA, true, false, true},
-
-    {"xrgb8",   PrPixelFormat_XRGB_4444_8u,  PixelFormat::RGBA8Unorm,  SourceTier::Int8,    ChannelOrder::ARGB, false, true,  false},
-    {"xrgb16",  PrPixelFormat_XRGB_4444_16u, PixelFormat::RGBA16Unorm, SourceTier::Int16,   ChannelOrder::ARGB, false, true,  false},
-    {"xrgb32f", PrPixelFormat_XRGB_4444_32f, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::ARGB, false, true,  false},
-    {"bgrx8",   PrPixelFormat_BGRX_4444_8u,  PixelFormat::RGBA8Unorm,  SourceTier::Int8,    ChannelOrder::BGRA, false, true,  false},
-    {"bgrx16",  PrPixelFormat_BGRX_4444_16u, PixelFormat::RGBA16Unorm, SourceTier::Int16,   ChannelOrder::BGRA, false, true,  false},
-    {"bgrx32f", PrPixelFormat_BGRX_4444_32f, PixelFormat::RGBA32Float, SourceTier::Float32, ChannelOrder::BGRA, false, true,  false},
-};
-
-const FormatInfo* find_format(PrPixelFormat pf) {
-    for (const auto& f : kFormats) if (f.pf == pf) return &f;
-    return nullptr;
-}
-const FormatInfo* find_token(const std::string& t) {
-    for (const auto& f : kFormats) if (t == f.token) return &f;
-    return nullptr;
-}
-
-// --- config ----------------------------------------------------------------
-enum class CsEncoding { Both, Buffer, Name };
-
-struct Config {
-    std::vector<PrPixelFormat> modes;   // PrPixelFormat_Any allowed
-    bool        colorspace_set = true;
-    std::string colorspace     = kPrWorkingColorSpace;
-    bool        sei            = false;   // colorspace names an sei: preset
-    prSEIColorCodesRec sei_codes;
-    CsEncoding  encoding       = CsEncoding::Both;
-    int         latency_frames = 0;
-};
-
-std::string trim(const std::string& s) {
-    const auto b = s.find_first_not_of(" \t\r\n");
-    if (b == std::string::npos) return {};
-    const auto e = s.find_last_not_of(" \t\r\n");
-    return s.substr(b, e - b + 1);
-}
-
-Config default_config() {
-    Config c;
-    for (const char* t : {"argb8", "argb16", "argb32f", "bgra8", "bgra16", "bgra32f"})
-        c.modes.push_back(find_token(t)->pf);
-    return c;
-}
-
-Config load_config() {
-    Config c = default_config();
-    FILE* f = std::fopen(kConfigPath, "r");
-    if (f == nullptr) { logf("config: %s absent, using defaults", kConfigPath); return c; }
-    char line[1024];
-    while (std::fgets(line, sizeof line, f) != nullptr) {
-        std::string s = line;
-        if (const auto h = s.find('#'); h != std::string::npos) s.resize(h);
-        const auto eq = s.find('=');
-        if (eq == std::string::npos) continue;
-        const std::string key = trim(s.substr(0, eq)), val = trim(s.substr(eq + 1));
-        if (key == "modes") {
-            c.modes.clear();
-            size_t pos = 0;
-            while (pos <= val.size()) {
-                const auto comma = val.find(',', pos);
-                const std::string tok = trim(val.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos));
-                if (tok == "any") c.modes.push_back(PrPixelFormat_Any);
-                else if (const FormatInfo* fi = find_token(tok)) c.modes.push_back(fi->pf);
-                else if (!tok.empty()) logf("config: unknown mode '%s' ignored", tok.c_str());
-                if (comma == std::string::npos) break;
-                pos = comma + 1;
-            }
-        } else if (key == "colorspace") {
-            if (val == "unset")        { c.colorspace_set = false; }
-            else if (val == "working") { c.colorspace_set = true; c.colorspace = kPrWorkingColorSpace; }
-            else if (val.rfind("sei:", 0) == 0) {
-                using P = PrColorPrimaries; using T = PrTransferCharacteristic; using M = PrMatrixEquations;
-                const std::string k = val.substr(4);
-                P pr = P::kBT709; T tr = T::kBT709;
-                if (k == "pq2020")    { pr = P::kBT2020; tr = T::kBT2100PQ; }
-                else if (k == "srgb") { pr = P::kBT709;  tr = T::kIEC61966_2_1; }
-                else if (k != "709")  logf("config: unknown sei preset '%s', using 709", k.c_str());
-                c.colorspace_set = true; c.sei = true; c.colorspace = val;
-                c.sei_codes.colorPrimariesCode         = static_cast<csSDK_int32>(pr);
-                c.sei_codes.transferCharacteristicCode = static_cast<csSDK_int32>(tr);
-                c.sei_codes.matrixEquationsCode        = static_cast<csSDK_int32>(M::kBT709);
-                c.sei_codes.bitDepth                   = static_cast<csSDK_int32>(PrEncodingBitDepth::k32f);
-                c.sei_codes.isFullRange                = kPrTrue;
-                c.sei_codes.isRGB                      = kPrTrue;
-            }
-            else                       { c.colorspace_set = true; c.colorspace = val; }
-        } else if (key == "cs_encoding") {
-            c.encoding = val == "buffer" ? CsEncoding::Buffer
-                       : val == "name"   ? CsEncoding::Name : CsEncoding::Both;
-        } else if (key == "latency") {
-            c.latency_frames = std::atoi(val.c_str());
-        } else {
-            logf("config: unknown key '%s' ignored", key.c_str());
-        }
-    }
-    std::fclose(f);
-    if (c.modes.empty()) { logf("config: no usable modes, using defaults"); c.modes = default_config().modes; }
-    return c;
-}
-
-time_t config_mtime() {
-    struct stat st {};
-    return ::stat(kConfigPath, &st) == 0 ? st.st_mtime : 0;
+    S.capacity = S.ring.header()->pixels_capacity;
+    logf("ring %s created, %llu KiB per slot", S.host.ring, (unsigned long long)(S.capacity / 1024));
+    return true;
 }
 
 // --- module state ------------------------------------------------------------
-// The ring lives at file scope, not in Plugin, and outlives module resets.
-// A NeedsReset runs Startup for the new plugin BEFORE Shutdown of the old
-// (seen in the A4 log), and a ring's destructor unlinks its name — so a ring
-// owned by the old Plugin could unlink the name the new one had just created,
-// leaving a producer publishing into a mapping no consumer can open. One ring
-// per process avoids the race outright.
-//
-// Frames from a second instance would overwrite the first; each frame's log
-// line carries its instance id so that shows.
-SharedRing S_ring;
-uint32_t   S_ring_w = 0, S_ring_h = 0;
-
 struct Plugin {
-    SPBasicSuite*    sp     = nullptr;
-    PrSDKPPixSuite*  ppix   = nullptr;
-    PrSDKTimeSuite*  time   = nullptr;
-    PrSDKStringSuite* str   = nullptr;
-    PrTime           ticks_per_second = 0;
-
-    Config           cfg;
-    time_t           cfg_mtime = 0;
+    SPBasicSuite*     sp   = nullptr;
+    PrSDKPPixSuite*   ppix = nullptr;
+    PrSDKTimeSuite*   time = nullptr;
+    PrSDKStringSuite* str  = nullptr;
+    PrTime            ticks_per_second = 0;
+    size_t            key_size = 0;
 };
 
-struct Instance {
-    csSDK_int32 id = 0;
-    uint64_t    frames = 0;
-    uint64_t    by_mode[3] = {0, 0, 0};    // stopped, playing, scrubbing
-    // What the last frame looked like, so the log records every change
-    // rather than every frame.
-    PrPixelFormat last_pf = PrPixelFormat_Invalid;
-    int32_t     last_w = -1, last_h = -1, last_rowbytes = 0;
-
-    // Timing, summarised per burst of frames (A4: what does the host's tier
-    // conversion cost?). A burst ends on a gap over kBurstGap, a format
-    // change, or 240 frames. Not keyed on play mode: AE's preview playback
-    // pushes as playmode_Scrubbing with inTime -1, never as Playing.
-    // Arrival interval is host cadence; copy is our host -> ring pass;
-    // render is the host's GetRenderTime.
-    struct Run {
-        uint64_t n = 0;
-        double   first = 0, last = 0;       // arrival, seconds (monotonic)
-        double   interval_sum = 0, interval_max = 0;
-        double   copy_sum = 0, copy_max = 0;
-        int64_t  render_sum = 0;
-        std::string fmt;
-        int32_t  w = 0, h = 0;              // of the first frame; a change is logged
-    } run;
-};
-
-double now_s() {
-    struct timespec ts {};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9;
-}
-
-void flush_run(Instance* I, const char* why) {
-    auto& r = I->run;
-    if (r.n >= 2) {
-        const double span = r.last - r.first;
-        logf("BURST %s instance %d: %llu frames of %s %dx%d in %.2f s = %.2f fps; interval mean %.2f max %.2f ms; "
-             "copy mean %.3f max %.3f ms; host render mean %.2f ms",
-             why, I->id, (unsigned long long)r.n, r.fmt.c_str(), r.w, r.h, span,
-             span > 0 ? (r.n - 1) / span : 0.0,
-             1000.0 * r.interval_sum / (r.n - 1), 1000.0 * r.interval_max,
-             1000.0 * r.copy_sum / r.n, 1000.0 * r.copy_max,
-             static_cast<double>(r.render_sum) / r.n);
-    }
-    r = Instance::Run{};
-}
-
-Plugin*   plugin(const tmStdParms* sp)  { return static_cast<Plugin*>(sp->ioPrivatePluginData); }
-Instance* instance(const tmInstance* i) { return static_cast<Instance*>(i->ioPrivateInstanceData); }
+Plugin* plugin(const tmStdParms* sp) { return static_cast<Plugin*>(sp->ioPrivatePluginData); }
 
 template <class T>
 void acquire(SPBasicSuite* sp, const char* name, int32_t version, T** out) {
     const void* p = nullptr;
     *out = sp->AcquireSuite(name, version, &p) == 0 ? static_cast<T*>(const_cast<void*>(p)) : nullptr;
-    if (*out == nullptr) {
-        *out = nullptr;
-        logf("suite %s v%d unavailable", name, version);
-    }
+    if (*out == nullptr) logf("suite %s v%d unavailable", name, version);
 }
 
 // Exceptions must never cross back into the host: it is C, and an escaping
-// C++ exception takes After Effects down with it.
+// C++ exception takes the application down with it.
 template <class F>
 tmResult guarded(const char* where, F&& f) {
     try { return f(); }
@@ -333,6 +151,8 @@ tmResult guarded(const char* where, F&& f) {
     catch (...)                     { logf("%s: unknown exception", where); }
     return tmResult_ErrorUnknown;
 }
+
+constexpr PrPixelFormat kModes[] = { PrPixelFormat_ARGB_4444_32f, PrPixelFormat_BGRA_4444_32f };
 
 // --- entry points ------------------------------------------------------------
 
@@ -345,12 +165,9 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
         acquire(P->sp, kPrSDKTimeSuite,   kPrSDKTimeSuiteVersion,   &P->time);
         acquire(P->sp, kPrSDKStringSuite, kPrSDKStringSuiteVersion, &P->str);
         if (P->time != nullptr) P->time->GetTicksPerSecond(&P->ticks_per_second);
-
-        P->cfg       = load_config();
-        P->cfg_mtime = config_mtime();
-        logf("startup: interface v%d, %zu mode(s) configured, colour space %s, ticks/s %lld",
-             tmInterfaceVersion, P->cfg.modes.size(),
-             P->cfg.colorspace_set ? ("'" + P->cfg.colorspace + "'").c_str() : "unset",
+        if (P->ppix != nullptr && P->ppix->GetUniqueKeySize(&P->key_size) != 0) P->key_size = 0;
+        if (S.host.ring == nullptr) S.host = detect_host();
+        logf("startup in %s: ring %s, ticks/s %lld", S.host.label, S.host.ring,
              static_cast<long long>(P->ticks_per_second));
 
         std::snprintf(info->outIdentifier.mGUID, sizeof info->outIdentifier.mGUID, "%s", kPluginGUID);
@@ -360,7 +177,7 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
         info->outClockAvailable      = kPrFalse;   // video only; the host keeps the clock
         info->outVideoAvailable      = kPrTrue;
         info->outVideoDefaultEnabled = kPrFalse;   // the user opts in, in Preferences
-        const char16_t name[] = u"QCBridgeAE (A4 probe)";
+        const char16_t name[] = u"QCBridgeAE → QCView";
         static_assert(sizeof(prUTF16Char) == sizeof(char16_t), "prUTF16Char is UTF-16");
         std::memcpy(info->outDisplayName, name, sizeof name);
         info->outHideInUI            = kPrFalse;
@@ -372,6 +189,8 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
     });
 }
 
+// The ring outlives module resets on purpose; it is retired only when the
+// host unloads the module (xTransmitEntry with loadModule false).
 tmResult Shutdown(tmStdParms* sp) {
     return guarded("Shutdown", [&] {
         Plugin* P = plugin(sp);
@@ -379,244 +198,151 @@ tmResult Shutdown(tmStdParms* sp) {
         if (P->ppix) P->sp->ReleaseSuite(kPrSDKPPixSuite,   kPrSDKPPixSuiteVersion);
         if (P->time) P->sp->ReleaseSuite(kPrSDKTimeSuite,   kPrSDKTimeSuiteVersion);
         if (P->str)  P->sp->ReleaseSuite(kPrSDKStringSuite, kPrSDKStringSuiteVersion);
-        logf("shutdown");
         delete P;
         sp->ioPrivatePluginData = nullptr;
         return tmResult_Success;
     });
 }
 
-// Polled by the host. A changed config file resets the module, which re-runs
-// Startup and re-queries every instance — the A4 control conditions without
-// restarting AE.
-tmResult NeedsReset(const tmStdParms* sp, prBool* outReset) {
-    return guarded("NeedsReset", [&] {
-        Plugin* P = plugin(sp);
-        *outReset = kPrFalse;
-        if (P != nullptr && config_mtime() != P->cfg_mtime) {
-            logf("config changed: requesting module reset");
-            *outReset = kPrTrue;
-        }
-        return tmResult_Success;
-    });
-}
-
-tmResult CreateInstance(const tmStdParms* sp, tmInstance* inst) {
+tmResult CreateInstance(const tmStdParms*, tmInstance* inst) {
     return guarded("CreateInstance", [&] {
-        auto* I = new Instance;
-        I->id = inst->inInstanceID;
-        inst->ioPrivateInstanceData = I;
-        const Plugin* P = plugin(sp);
-        const double fps = (inst->inVideoFrameRate > 0 && P->ticks_per_second > 0)
-            ? static_cast<double>(P->ticks_per_second) / static_cast<double>(inst->inVideoFrameRate) : 0.0;
-        logf("instance %d: video %d, %dx%d, PAR %d:%d, %.3f fps, field %d, timeline %d, play %d",
-             inst->inInstanceID, inst->inHasVideo, inst->inVideoWidth, inst->inVideoHeight,
-             inst->inVideoPARNum, inst->inVideoPARDen, fps, static_cast<int>(inst->inVideoFieldType),
-             inst->inTimelineID != 0 ? 1 : 0, inst->inPlayID != 0 ? 1 : 0);
+        inst->ioPrivateInstanceData = nullptr;
+        // Informational only: AE reports a 720x480 placeholder here until a
+        // comp is open (A4). Geometry comes from each frame.
+        logf("instance %d: %dx%d", inst->inInstanceID, inst->inVideoWidth, inst->inVideoHeight);
+        if (S.ring.valid()) S.ring.set_host_state(HostState::Active);
         return tmResult_Success;
     });
 }
 
 tmResult DisposeInstance(const tmStdParms*, tmInstance* inst) {
     return guarded("DisposeInstance", [&] {
-        Instance* I = instance(inst);
-        if (I != nullptr) {
-            flush_run(I, "disposed");
-            logf("instance %d disposed after %llu frames (stopped %llu, playing %llu, scrubbing %llu)",
-                 I->id, (unsigned long long)I->frames, (unsigned long long)I->by_mode[0],
-                 (unsigned long long)I->by_mode[1], (unsigned long long)I->by_mode[2]);
-            delete I;
-        }
-        inst->ioPrivateInstanceData = nullptr;
+        logf("instance %d disposed", inst->inInstanceID);
         return tmResult_Success;
     });
 }
 
-// Called with index 0, 1, 2… Returning ContinueIterate asks for the next;
-// Success ends the list. The host then picks "the best format to use on a
-// per-segment basis" — which of these it picks, per project depth, is the
-// first thing A4 records.
-tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance* inst, csSDK_int32 index, tmVideoMode* out) {
+tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance*, csSDK_int32 index, tmVideoMode* out) {
     return guarded("QueryVideoMode", [&] {
+        constexpr int kCount = static_cast<int>(sizeof kModes / sizeof kModes[0]);
+        if (index < 0 || index >= kCount) return tmResult_ErrorInvalidArgument;
         Plugin* P = plugin(sp);
-        const auto& modes = P->cfg.modes;
-        if (index < 0 || static_cast<size_t>(index) >= modes.size()) {
-            logf("QueryVideoMode: index %d past %zu modes", index, modes.size());
-            return tmResult_ErrorInvalidArgument;
-        }
-        const PrSDKColorSpaceType prefilled = out->outColorSpaceRec.outColorSpaceType;
 
-        out->outWidth       = 0;             // any: we follow the host's size
+        out->outWidth       = 0;   // any: we follow the host's size
         out->outHeight      = 0;
         out->outPARNum      = 0;
         out->outPARDen      = 0;
         out->outFieldType   = prFieldsAny;
-        out->outPixelFormat = modes[static_cast<size_t>(index)];
+        out->outPixelFormat = kModes[index];
         out->outStreamLabel = PrSDKString{};
-        out->outLatency     = inst->inVideoFrameRate * P->cfg.latency_frames;
+        out->outLatency     = 0;   // a live viewer wants no preroll
 
-        // Only the fields we own. inPrivateData is the host's; an unset
-        // colour space leaves the record exactly as the host handed it over,
-        // so the "unset" control really is the host default.
-        if (P->cfg.colorspace_set && P->cfg.sei) {
-            out->outColorSpaceRec.outColorSpaceType = kPrSDKColorSpaceType_SEITags;
-            out->outColorSpaceRec.outSEICodesRec    = P->cfg.sei_codes;
-        } else if (P->cfg.colorspace_set) {
-            ColorSpaceRec& cs = out->outColorSpaceRec;
-            cs.outColorSpaceType = kPrSDKColorSpaceType_Predefined;
-            cs.ioProfileRec.ioBufferSize        = 0;
-            cs.ioProfileRec.inDestinationBuffer = nullptr;
-            cs.ioProfileRec.outName             = PrSDKString{};
-            if (P->cfg.encoding != CsEncoding::Name) {
-                cs.ioProfileRec.inDestinationBuffer = const_cast<char*>(P->cfg.colorspace.c_str());
-                cs.ioProfileRec.ioBufferSize        = static_cast<csSDK_int32>(P->cfg.colorspace.size() + 1);
-            }
-            // A fresh string for every mode, never disposed by us. The host
-            // takes ownership of what it reads: with one string shared across
-            // modes, every mode after the first carried a spent handle and AE
-            // fell back to its default Rec.709 conversion (A4, R17). Same
-            // contract PrSDKTransmit.h states for the audio output names.
-            if (P->cfg.encoding != CsEncoding::Buffer && P->str != nullptr) {
-                PrSDKString name {};
-                if (P->str->AllocateFromUTF8(reinterpret_cast<const prUTF8Char*>(P->cfg.colorspace.c_str()),
-                                             &name) == 0)
-                    cs.ioProfileRec.outName = name;
-                else
-                    logf("QueryVideoMode: could not allocate colour-space name");
-            }
-        }
+        // Only the fields we own; inPrivateData is the host's.
+        ColorSpaceRec& cs = out->outColorSpaceRec;
+        cs.outColorSpaceType                = kPrSDKColorSpaceType_Predefined;
+        cs.ioProfileRec.ioBufferSize        = 0;
+        cs.ioProfileRec.inDestinationBuffer = nullptr;
+        cs.ioProfileRec.outName             = PrSDKString{};
+        // A fresh string per mode, never disposed by us: the host owns it.
+        PrSDKString name {};
+        if (P->str != nullptr
+            && P->str->AllocateFromUTF8(reinterpret_cast<const prUTF8Char*>(kPrWorkingColorSpace), &name) == 0)
+            cs.ioProfileRec.outName = name;
+        else
+            logf("QueryVideoMode: could not allocate the working-space name; "
+                 "under Adobe CMS the host will convert to Rec.709");
 
-        const FormatInfo* fi = find_format(out->outPixelFormat);
-        logf("QueryVideoMode instance %d #%d: offer %s (%s), host prefilled colour type %d, colour space %s",
-             inst->inInstanceID, index, fi ? fi->token : "any", fourcc(out->outPixelFormat).c_str(),
-             static_cast<int>(prefilled),
-             P->cfg.colorspace_set ? P->cfg.colorspace.c_str() : "(unset)");
-
-        return static_cast<size_t>(index) + 1 < modes.size() ? tmResult_ContinueIterate : tmResult_Success;
+        return index + 1 < kCount ? tmResult_ContinueIterate : tmResult_Success;
     });
 }
 
 tmResult ActivateDeactivate(const tmStdParms*, const tmInstance* inst, PrActivationEvent ev,
-                            prBool audioActive, prBool videoActive) {
+                            prBool, prBool videoActive) {
     return guarded("ActivateDeactivate", [&] {
-        logf("instance %d: activation event %d, audio %d, video %d",
-             inst->inInstanceID, static_cast<int>(ev), audioActive, videoActive);
+        const HostState st = videoActive ? HostState::Active
+                           : ev == PrActivationEvent_ApplicationLostFocus ? HostState::PausedFocus
+                           : HostState::Paused;
+        if (S.ring.valid()) S.ring.set_host_state(st);
+        logf("instance %d: activation event %d, video %d -> state %u", inst->inInstanceID,
+             static_cast<int>(ev), videoActive, static_cast<unsigned>(st));
         return tmResult_Success;
     });
 }
 
-// Copies one host frame into the ring, byte for byte. Rows may be padded and
-// rowbytes may be negative (PrSDKPPixSuite: "May be negative"), i.e. stored
-// bottom-up; row y is at base + y * rowbytes either way, so walking by the
-// signed stride lands the ring top-down. A4 confirms the orientation with a
-// comp that differs top to bottom.
-void publish(Plugin* P, Instance* I, const tmInstance* inst, const tmPushVideo* pv, PPixHand h) {
+void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
+    // The pair a viewer change pushes: identical key, identical pixels.
+    if (P->key_size > 0) {
+        std::vector<unsigned char> key(P->key_size);
+        if (P->ppix->GetUniqueKey(h, key.data(), key.size()) == 0) {
+            if (key == S.last_key) { ++S.skipped_duplicates; return; }
+            S.last_key = std::move(key);
+        } else {
+            S.last_key.clear();
+        }
+    }
+
     PrPixelFormat pf = PrPixelFormat_Invalid;
     prRect bounds {};
-    csSDK_int32 rowbytes = 0, render_ms = -1;
+    csSDK_int32 rowbytes = 0;
     char* base = nullptr;
     P->ppix->GetPixelFormat(h, &pf);
     P->ppix->GetBounds(h, &bounds);
     P->ppix->GetRowBytes(h, &rowbytes);
-    P->ppix->GetRenderTime(h, &render_ms);
     P->ppix->GetPixels(h, PrPPixBufferAccess_ReadOnly, &base);
+
+    HostOrder order;
+    if (pf == PrPixelFormat_ARGB_4444_32f)      order = HostOrder::ARGB;
+    else if (pf == PrPixelFormat_BGRA_4444_32f) order = HostOrder::BGRA;
+    else { logf("unexpected pixel format 0x%08x; frame dropped", static_cast<unsigned>(pf)); return; }
 
     const int32_t w = std::abs(bounds.right - bounds.left);
     const int32_t hgt = std::abs(bounds.bottom - bounds.top);
-    const int mode = pv->inPlayMode == playmode_Playing ? 1 : pv->inPlayMode == playmode_Scrubbing ? 2 : 0;
-    ++I->frames;
-    ++I->by_mode[mode];
-    const double arrived = now_s();
-    constexpr double kBurstGap = 0.5;
-    if (I->run.n > 0 && (arrived - I->run.last > kBurstGap || pf != I->last_pf
-                         || w != I->run.w || hgt != I->run.h)) flush_run(I, "ended");
-
-    const FormatInfo* fi = find_format(pf);
-    const bool changed = pf != I->last_pf || w != I->last_w || hgt != I->last_h
-                      || (rowbytes < 0) != (I->last_rowbytes < 0);
-    if (changed || I->frames <= 5 || (I->frames % 100) == 0) {
-        logf("frame %llu instance %d: %s (%s)%s%s%s, %dx%d, rowbytes %d, time %lld, mode %d, quality %d, render %d ms",
-             (unsigned long long)I->frames, inst->inInstanceID, fi ? fi->token : "UNSUPPORTED",
-             fourcc(pf).c_str(), fi && fi->premultiplied ? " premultiplied" : "",
-             fi && fi->opaque_x ? " opaque-X" : "", fi && fi->linear ? " LINEAR" : "",
-             w, hgt, rowbytes, static_cast<long long>(pv->inTime), mode,
-             static_cast<int>(pv->inQuality), render_ms);
-    }
-    I->last_pf = pf; I->last_w = w; I->last_h = hgt; I->last_rowbytes = rowbytes;
-
-    if (fi == nullptr || base == nullptr || w <= 0 || hgt <= 0) return;
-
-    const auto uw = static_cast<uint32_t>(w), uh = static_cast<uint32_t>(hgt);
-    // Sized for native 32f (16 B/px), the widest thing the probe carries, so
-    // a tier change never needs a rebuild — only a geometry change does.
-    if (!S_ring.valid() || S_ring_w != uw || S_ring_h != uh) {
-        S_ring = SharedRing();
-        if (S_ring.create(kRingName, frame_bytes(uw, uh, PixelFormat::RGBA32Float))) {
-            S_ring_w = uw; S_ring_h = uh;
-            logf("ring created for %ux%u", uw, uh);
-        } else {
-            logf("ring create failed: %s", S_ring.error().c_str());
-            return;
-        }
-    }
-
-    const uint32_t bpp     = bytes_per_pixel(fi->wire);
-    const uint32_t dst_row = aligned_bytes_per_row(uw, bpp);
-    const size_t   tight   = static_cast<size_t>(uw) * bpp;
-    if (static_cast<size_t>(std::abs(rowbytes)) < tight) {
-        logf("rowbytes %d shorter than a %zu-byte row; frame skipped", rowbytes, tight);
+    if (base == nullptr || w <= 0 || hgt <= 0 || std::abs(rowbytes) < w * 16) {
+        logf("unusable frame %dx%d rowbytes %d; dropped", w, hgt, rowbytes);
         return;
     }
-    auto* dst = static_cast<uint8_t*>(S_ring.begin_write(static_cast<uint64_t>(dst_row) * uh));
-    if (dst == nullptr) { logf("begin_write refused %ux%u", uw, uh); return; }
-    const double copy_start = now_s();
-    for (uint32_t y = 0; y < uh; ++y)
-        std::memcpy(dst + static_cast<size_t>(y) * dst_row,
-                    base + static_cast<ptrdiff_t>(y) * rowbytes, tight);
-    const double copy_s = now_s() - copy_start;
+    const auto uw = static_cast<uint32_t>(w), uh = static_cast<uint32_t>(hgt);
+    const uint32_t dst_row = aligned_bytes_per_row(uw, 8u);
+    if (!ensure_capacity(static_cast<uint64_t>(dst_row) * uh)) return;
 
-    {
-        auto& r = I->run;
-        if (r.n == 0) { r.first = arrived; r.fmt = fi->token; r.w = w; r.h = hgt; }
-        else {
-            const double iv = arrived - r.last;
-            r.interval_sum += iv;
-            if (iv > r.interval_max) r.interval_max = iv;
-        }
-        r.last = arrived;
-        ++r.n;
-        r.copy_sum += copy_s;
-        if (copy_s > r.copy_max) r.copy_max = copy_s;
-        r.render_sum += render_ms > 0 ? render_ms : 0;
-        if (r.n == 240) flush_run(I, "window");
-    }
+    auto* dst = static_cast<uint8_t*>(S.ring.begin_write(static_cast<uint64_t>(dst_row) * uh));
+    if (dst == nullptr) { logf("begin_write refused %ux%u", uw, uh); return; }
+
+    // Both hosts deliver bottom-up with positive rowbytes (A4 sections 3,
+    // 13). A negative stride would already be top-down in walk order.
+    const ConvertSource src {base, rowbytes, uw, uh, order, rowbytes > 0};
+    const ConvertResult cr = convert_32f_to_rgba16f(src, dst, dst_row);
 
     FrameDesc d {};
     d.width         = uw;
     d.height        = uh;
     d.bytes_per_row = dst_row;
-    d.pixel_format  = fi->wire;
-    d.source_tier   = fi->tier;
-    d.channel_order = fi->order;
-    d.flags         = fi->premultiplied ? kFlagPremultiplied : kFlagNone;
-    d.time_value    = pv->inTime;
+    d.pixel_format  = PixelFormat::RGBA16F;
+    d.source_tier   = SourceTier::Float32;
+    d.channel_order = ChannelOrder::RGBA;
+    d.flags         = (cr.has_inf ? kFlagHasInf : 0u) | (cr.has_nan ? kFlagHasNaN : 0u);
+    d.time_value    = pv->inTime;          // -1 from AE's viewer and preview: "immediate"
     d.time_scale    = P->ticks_per_second;
-    d.value_scale   = fi->tier == SourceTier::Int16 ? kAE16ValueScale : 1.0f;
-    std::snprintf(d.comp_name, sizeof d.comp_name, "%s", fi->token);   // no comp name reaches a Transmit device
-    S_ring.commit(d);
+    d.value_scale   = 1.0f;
+    std::snprintf(d.comp_name, sizeof d.comp_name, "%s", S.host.label);
+    S.ring.commit(d);
+    S.ring.set_host_state(HostState::Active);
+
+    if (++S.published == 1 || (S.published % 500) == 0 || cr.has_inf || cr.has_nan)
+        logf("published %llu (%ux%u %s%s%s), %llu duplicates skipped", (unsigned long long)S.published,
+             uw, uh, order == HostOrder::ARGB ? "ARGB" : "BGRA",
+             cr.has_inf ? ", has inf" : "", cr.has_nan ? ", has NaN" : "",
+             (unsigned long long)S.skipped_duplicates);
 }
 
-tmResult PushVideo(const tmStdParms* sp, const tmInstance* inst, const tmPushVideo* pv) {
+tmResult PushVideo(const tmStdParms* sp, const tmInstance*, const tmPushVideo* pv) {
     Plugin* P = plugin(sp);
-    Instance* I = instance(inst);
     const tmResult r = guarded("PushVideo", [&] {
-        if (P != nullptr && I != nullptr && P->ppix != nullptr && pv->inFrameCount > 0)
-            publish(P, I, inst, pv, pv->inFrames[0].inFrame);
-        if (pv->inFrameCount > 1) logf("PushVideo carried %zu frames; probe publishes the first", pv->inFrameCount);
+        if (P != nullptr && P->ppix != nullptr && pv->inFrameCount > 0)
+            publish(P, pv, pv->inFrames[0].inFrame);
         return tmResult_Success;
     });
-    // "The plug-in is responsible for disposing of all passed in ppix" —
-    // every one, whatever happened above.
+    // "The plug-in is responsible for disposing of all passed in ppix."
     if (P != nullptr && P->ppix != nullptr)
         for (csSDK_size_t i = 0; i < pv->inFrameCount; ++i) P->ppix->Dispose(pv->inFrames[i].inFrame);
     return r;
@@ -631,13 +357,13 @@ tmResult xTransmitEntry(csSDK_int32 interfaceVersion, prBool loadModule, piSuite
         std::memset(out, 0, sizeof *out);   // 0 = unsupported, per PrSDKTransmit.h
         out->Startup            = Startup;
         out->Shutdown           = Shutdown;
-        out->NeedsReset         = NeedsReset;
         out->CreateInstance     = CreateInstance;
         out->DisposeInstance    = DisposeInstance;
         out->QueryVideoMode     = QueryVideoMode;
         out->ActivateDeactivate = ActivateDeactivate;
         out->PushVideo          = PushVideo;
     } else {
+        retire_ring("module unloaded");
         logf("--- module unload ---");
     }
     return tmResult_Success;

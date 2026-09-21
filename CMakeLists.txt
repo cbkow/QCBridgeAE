@@ -103,7 +103,7 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# qcbae-transmit — the Mercury Transmit device (phase A4 probe, Route A).
+# qcbae-transmit — the Mercury Transmit device (A6), and its A4 probe (Route A).
 #
 # Needs the Premiere Pro SDK, also Adobe Confidential and also private/ only.
 # A Transmit plugin on macOS is a plain BNDL bundle: no PiPL, and its whole
@@ -116,24 +116,32 @@ set(_pr_headers "${QCBAE_PR_SDK}/Examples/Headers")
 
 if(APPLE AND EXISTS "${_pr_headers}/PrSDKTransmit.h")
     message(STATUS "Premiere SDK found: ${QCBAE_PR_SDK}")
-    add_library(qcbae-transmit MODULE src/transmit/qcbae_transmit.cpp)
-    target_link_libraries(qcbae-transmit PRIVATE qcbae_common)
-    target_include_directories(qcbae-transmit PRIVATE "${_pr_headers}")
-    set_target_properties(qcbae-transmit PROPERTIES
-        BUNDLE TRUE
-        BUNDLE_EXTENSION "bundle"
-        OUTPUT_NAME "QCBridgeAE-Transmit"
-        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/src/transmit/Info.plist.in")
-    # The host binds by name; -dead_strip would otherwise take the entry point.
-    target_link_options(qcbae-transmit PRIVATE "-Wl,-exported_symbol,_xTransmitEntry" "-Wl,-dead_strip")
-    # Same reason as the AEGP: POST_BUILD only runs on relink, so a plist-only
-    # edit must force one or the signature stops matching the bundle.
-    set_property(TARGET qcbae-transmit APPEND PROPERTY LINK_DEPENDS
-                 "${CMAKE_CURRENT_SOURCE_DIR}/src/transmit/Info.plist.in")
-    add_custom_command(TARGET qcbae-transmit POST_BUILD
-        COMMAND codesign ${_sign_flags} "$<TARGET_BUNDLE_DIR:qcbae-transmit>"
-        COMMAND codesign --verify --deep --strict "$<TARGET_BUNDLE_DIR:qcbae-transmit>"
-        COMMENT "codesign (qcbae-transmit)" VERBATIM)
+    function(qcbae_transmit_bundle target source output plist)
+        add_library(${target} MODULE ${source})
+        target_link_libraries(${target} PRIVATE qcbae_common)
+        target_include_directories(${target} PRIVATE "${_pr_headers}")
+        set_target_properties(${target} PROPERTIES
+            BUNDLE TRUE
+            BUNDLE_EXTENSION "bundle"
+            OUTPUT_NAME "${output}"
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/${plist}")
+        # The host binds by name; -dead_strip would otherwise take the entry point.
+        target_link_options(${target} PRIVATE "-Wl,-exported_symbol,_xTransmitEntry" "-Wl,-dead_strip")
+        # Same reason as the AEGP: POST_BUILD only runs on relink, so a
+        # plist-only edit must force one or the signature stops matching.
+        set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${plist}")
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND codesign ${_sign_flags} "$<TARGET_BUNDLE_DIR:${target}>"
+            COMMAND codesign --verify --deep --strict "$<TARGET_BUNDLE_DIR:${target}>"
+            COMMENT "codesign (${target})" VERBATIM)
+    endfunction()
+    # The product (A6): what users install.
+    qcbae_transmit_bundle(qcbae-transmit src/transmit/qcbae_transmit.cpp
+                          QCBridgeAE-Transmit src/transmit/Info.plist.in)
+    # The A4 probe: publishes host frames unaltered into /qcbae-probe, with a
+    # config file for control conditions. An instrument, kept for re-measuring.
+    qcbae_transmit_bundle(qcbae-transmit-probe src/transmit/qcbae_transmit_probe.cpp
+                          QCBridgeAE-Transmit-Probe src/transmit/Info-probe.plist.in)
 else()
     message(STATUS "Premiere SDK not found at ${QCBAE_PR_SDK} — skipping qcbae-transmit")
 endif()

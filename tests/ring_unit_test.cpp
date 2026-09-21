@@ -112,6 +112,17 @@ int main() {
 
     check(!producer.set_icc_profile(fake_icc.data(), 128 * 1024), "rejects a profile larger than the region");
 
+    // --- Host state ---------------------------------------------------------
+    // Read from the consumer's own mapping: the state exists to reach a
+    // process that is receiving no frames, so a producer-side read proves
+    // nothing about it.
+    check(consumer.host_state() == HostState::Active, "a new ring reads as Active");
+    producer.set_host_state(HostState::PausedFocus);
+    check(consumer.host_state() == HostState::PausedFocus, "consumer sees PausedFocus");
+    producer.set_host_state(HostState::Retired);
+    check(consumer.host_state() == HostState::Retired, "consumer sees Retired");
+    check(SharedRing().host_state() == HostState::Retired, "an unopened ring reads as Retired");
+
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "PASS" : "FAIL",
                 failures, failures == 1 ? "" : "s");
     return failures == 0 ? 0 : 1;

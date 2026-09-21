@@ -19,7 +19,7 @@
 namespace qcbae {
 
 inline constexpr uint32_t kRingMagic        = 0x51434145u;  // 'QCAE'
-inline constexpr uint32_t kFrameDescVersion = 3u;   // v2: channel_order; v3: non-finite flags replace the clamp flag
+inline constexpr uint32_t kFrameDescVersion = 3u;   // v2: channel_order; v3: non-finite flags replace the clamp flag, ring header gains host_state
 
 inline constexpr uint32_t kMaxCompName = 128u;
 

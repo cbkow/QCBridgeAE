@@ -269,4 +269,13 @@ uint64_t SharedRing::read_icc_profile(uint64_t known_generation, std::string* ou
     return 0u;
 }
 
+void SharedRing::set_host_state(HostState st) {
+    if (header_ != nullptr) header_->host_state.store(static_cast<uint32_t>(st), std::memory_order_release);
+}
+
+HostState SharedRing::host_state() const {
+    return header_ != nullptr ? static_cast<HostState>(header_->host_state.load(std::memory_order_acquire))
+                              : HostState::Retired;
+}
+
 }  // namespace qcbae

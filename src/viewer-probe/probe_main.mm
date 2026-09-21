@@ -42,7 +42,19 @@ using namespace qcbae;
 
 namespace {
 
-constexpr const char* kRingName = "/qcbae-probe";
+// The synthetic producer and the A4 probe use /qcbae-probe; the A6 device uses
+// one name per host (shared_ring.h). `--ring ae|premiere|/name` picks.
+std::string g_ring = "/qcbae-probe";
+
+const char* host_state_name(HostState st) {
+    switch (st) {
+        case HostState::Active:      return "active";
+        case HostState::PausedFocus: return "PAUSED: host lost focus (untick 'Disable video output when in the background')";
+        case HostState::Paused:      return "paused by host";
+        case HostState::Retired:     return "retired";
+    }
+    return "?";
+}
 
 uint16_t to_half(float f) {
     if (f <= 0.0f) return 0;
@@ -66,7 +78,7 @@ int run_producer(uint32_t w, uint32_t h, double fps, SourceTier tier) {
 
     SharedRing ring;
     // Sized for the worst tier so a format change needs no rebuild.
-    if (!ring.create(kRingName, max_frame_bytes(w, h))) {
+    if (!ring.create(g_ring.c_str(), max_frame_bytes(w, h))) {
         std::fprintf(stderr, "producer: %s\n", ring.error().c_str());
         return 1;
     }
@@ -74,7 +86,7 @@ int run_producer(uint32_t w, uint32_t h, double fps, SourceTier tier) {
                          : fmt == PixelFormat::RGBA16Unorm ? "RGBA16Unorm (AE 16bpc, native)"
                                                            : "RGBA16F (AE 32bpc, converted)";
     std::printf("producing %ux%u %s at %.1f fps into %s (ctrl-C to stop)\n",
-                w, h, fmt_name, fps, kRingName);
+                w, h, fmt_name, fps, g_ring.c_str());
 
     // A stand-in ICC blob so the consumer's profile path is exercised before
     // A2 supplies a real one from AEGP_ColorSettingsSuite6.
@@ -209,7 +221,7 @@ std::string icc_description(const std::string& icc) {
 
 int run_dump(int argc, const char** argv) {
     SharedRing ring;
-    if (!ring.open(kRingName)) {
+    if (!ring.open(g_ring.c_str())) {
         std::fprintf(stderr, "dump: %s\n", ring.error().c_str());
         return 1;
     }
@@ -241,6 +253,10 @@ int run_dump(int argc, const char** argv) {
     std::printf("seq %llu  %ux%u  %s  order %s  tier %u  scale %.6f  row %u\n",
                 (unsigned long long)last_seen, d.width, d.height, fmt, ord,
                 (unsigned)d.source_tier, d.value_scale, d.bytes_per_row);
+    std::printf("host state: %s\n", host_state_name(ring.host_state()));
+    if (d.flags & (kFlagHasInf | kFlagHasNaN))
+        std::printf("NON-FINITE: frame carries%s%s\n", (d.flags & kFlagHasInf) ? " inf" : "",
+                    (d.flags & kFlagHasNaN) ? " NaN" : "");
     std::printf("time %lld/%lld  premult %d  comp \"%s\"\n",
                 (long long)d.time_value, (long long)d.time_scale,
                 (d.flags & kFlagPremultiplied) ? 1 : 0, d.comp_name);
@@ -407,7 +423,7 @@ fragment float4 f_main(VSOut in [[stage_in]],
 
 - (BOOL)openRing {
     if (_ring.valid()) return YES;
-    if (!_ring.open(kRingName)) return NO;
+    if (!_ring.open(g_ring.c_str())) return NO;
 
     // One MTLBuffer + texture per slot, created once. Rebuilding them per
     // frame would be the copy we went to shared memory to avoid.
@@ -458,6 +474,15 @@ fragment float4 f_main(VSOut in [[stage_in]],
 }
 
 - (void)tick {
+    // A retired mapping stays readable forever but will never change again:
+    // the producer has moved to a new one under the same name. Let go and
+    // re-open, or the window freezes on the last frame of the old ring.
+    if (_ring.valid() && _ring.host_state() == HostState::Retired) {
+        _ring = SharedRing();
+        _buffers.clear(); _textures.clear(); _slotFormats.clear();
+        _lastSeen = 0;
+        std::printf("ring retired by its producer; re-opening %s\n", g_ring.c_str());
+    }
     if (![self openRing]) return;
 
     FrameDesc d{};
@@ -502,14 +527,16 @@ fragment float4 f_main(VSOut in [[stage_in]],
     const double since = std::chrono::duration<double>(now - _statAt).count();
     if (since >= 0.5) {
         NSString* s = [NSString stringWithFormat:
-            @"%ux%u  %s  seq %llu  shown %llu  skipped(last) %llu  %.1f fps  \"%s\"",
+            @"%ux%u  %s  seq %llu  shown %llu  skipped(last) %llu  %.1f fps  \"%s\"  %s%s",
             d.width, d.height,
             d.pixel_format == PixelFormat::RGBA8Unorm  ? "8i native"
               : d.pixel_format == PixelFormat::RGBA16Unorm ? "16i native"
               : d.pixel_format == PixelFormat::RGBA32Float ? "32f native"
-              : "32f->16f",
+              : "RGBA16F",
             (unsigned long long)_lastSeen, (unsigned long long)_framesShown,
-            (unsigned long long)skipped, _framesShown / since, d.comp_name];
+            (unsigned long long)skipped, _framesShown / since, d.comp_name,
+            host_state_name(_ring.host_state()),
+            (d.flags & (kFlagHasInf | kFlagHasNaN)) ? "  NON-FINITE" : ""];
         _hud.stringValue = s;
         _framesShown = 0;
         _statAt = now;
@@ -545,7 +572,21 @@ fragment float4 f_main(VSOut in [[stage_in]],
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)a { return YES; }
 @end
 
-int main(int argc, const char** argv) {
+int main(int argc, const char** argv_in) {
+    // Pull --ring out before the modes see their arguments (dump reads x y
+    // pairs positionally).
+    std::vector<const char*> args;
+    for (int i = 0; i < argc; ++i) {
+        const std::string a = argv_in[i];
+        if (a == "--ring" && i + 1 < argc) {
+            const std::string v = argv_in[++i];
+            g_ring = v == "ae" ? kRingNameAfterEffects : v == "premiere" ? kRingNamePremiere : v;
+            continue;
+        }
+        args.push_back(argv_in[i]);
+    }
+    argc = static_cast<int>(args.size());
+    const char** argv = args.data();
     const std::string mode = argc > 1 ? argv[1] : "";
     if (mode == "produce") {
         uint32_t w = 1280, h = 720; double fps = 24.0;
@@ -576,6 +617,7 @@ int main(int argc, const char** argv) {
         "usage:\n"
         "  qcbae-probe produce [--width W] [--height H] [--fps N]\n"
         "  qcbae-probe view\n"
-        "  qcbae-probe dump [x y]...\n");
+        "  qcbae-probe dump [x y]...\n"
+        "  any mode: --ring ae | premiere | /name   (default /qcbae-probe)\n");
     return 2;
 }

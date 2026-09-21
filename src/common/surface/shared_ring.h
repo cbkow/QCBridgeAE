@@ -51,6 +51,29 @@ inline constexpr size_t kMaxShmName = 31u;
 // `latest` carries (sequence, slot) in one word so a consumer never has to
 // infer where a frame landed. 8 bits of slot caps the ring at 255, which is
 // ~250 more than anything sane, and leaves 56 bits of sequence.
+// Fixed ring names, one per host (PLAN.md A6). A consumer lists these; a
+// second running copy of the same host would collide, which v1 accepts.
+inline constexpr const char* kRingNameAfterEffects = "/qcbae-ae";
+inline constexpr const char* kRingNamePremiere     = "/qcbae-premiere";
+
+// What the producer's host is doing, for a consumer to explain what it sees.
+// It lives in the ring header, not in FrameDesc, because the interesting
+// states are exactly the ones in which no frames arrive.
+enum class HostState : uint32_t {
+    Active       = 0,
+    // The host switched the device's video off because the application lost
+    // focus. With AE's default preferences this is every time the user looks
+    // at QCView; unticking "Disable video output when in the background"
+    // stops it (lab/results/2026-09-21-a4-transmit-probe/, section 12).
+    PausedFocus  = 1,
+    Paused       = 2,   // video switched off for another reason
+    // This mapping is finished: the producer is replacing it (a larger frame
+    // needed more room, or a module reset) or shutting down. A consumer
+    // should close it and re-open the name. A name alone cannot tell a
+    // consumer its mapping went stale — the old one stays readable forever.
+    Retired      = 3,
+};
+
 inline constexpr uint32_t kSlotBits  = 8u;
 inline constexpr uint64_t kSlotMask  = (1ull << kSlotBits) - 1ull;
 inline constexpr uint32_t kMaxSlots  = static_cast<uint32_t>(kSlotMask);
@@ -93,7 +116,7 @@ struct RingHeader {
     std::atomic<uint64_t> icc_seq;
     std::atomic<uint64_t> icc_generation;
     std::atomic<uint32_t> icc_len;
-    uint32_t _pad;
+    std::atomic<uint32_t> host_state;   // HostState; was padding before FrameDesc v3
 };
 
 struct SlotHeader {
@@ -135,6 +158,8 @@ public:
     // every project-settings change; never on a per-frame path.
     bool  set_icc_profile(const void* data, uint32_t len);
 
+    void  set_host_state(HostState s);
+
     // --- Consumer ----------------------------------------------------------
     // Claims the newest frame if it differs from `last_seen`. On success the
     // pixels stay valid until release(). Updates `last_seen` to the acquired
@@ -150,6 +175,8 @@ public:
     // Copies the ICC blob out if `generation` differs from the caller's.
     // Returns the new generation, or 0 when unchanged or absent.
     uint64_t read_icc_profile(uint64_t known_generation, std::string* out_blob) const;
+
+    HostState host_state() const;
 
 private:
     void  close();
