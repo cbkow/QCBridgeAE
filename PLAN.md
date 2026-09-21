@@ -137,9 +137,24 @@ keeping a table of per-format special cases. Pinned by
 `tests/texture_format_test.mm`, which asserts both that the raw sample is wrong
 and that the scale fixes it.
 
-**D4 — Clamp at 65504 on the 32f path.** Half overflows to `inf` above that and
-AE scene-linear specular hits legitimately go there; `inf` does ugly things
-downstream in OCIO.
+**D4 — Never clamp: IEEE conversion, non-finite values flagged.** *(Revised
+2026-09-21 (chris); the original said "clamp at 65504".)* 32f → half is the
+standard IEEE conversion, round-to-nearest-even, and nothing more: sign kept
+(negatives are real in scene-linear work), subnormals kept, magnitudes past
+half's range become ±inf, NaN stays NaN. Clamping would hand QCView a
+plausible bright value in place of an error — hiding exactly what a QC viewer
+exists to show. NaN and inf in a comp are real bugs (a divide by zero in an
+expression, a broken effect) that AE's own viewer tends to hide.
+
+The sidecar flags any frame carrying them (`kFlagHasInf`, `kFlagHasNaN`), so
+QCView can surface them deliberately — e.g. a false-colour overlay — rather
+than let its OCIO pass and bilinear filtering do whatever the GPU does with
+them (NaN usually renders black and spreads to its neighbours). That handling
+is QCView's (A3).
+
+Rare in practice: A2b drove white to +20 stops and reached 322.5. Overflow
+needs pathological values; NaN needs broken maths. The rule is about not
+lying, not about everyday frames.
 
 **D5 — The sidecar carries container facts, not colour semantics.**
 *(Revised 2026-09-20 after measuring; the original had it driving QCView's OCIO

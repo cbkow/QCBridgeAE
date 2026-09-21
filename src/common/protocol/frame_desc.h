@@ -1,10 +1,11 @@
 // QCBridgeAE — the sidecar schema.
 //
-// The shared surface carries numbers; this struct carries what they mean
-// (PLAN.md D5). Preserving values while mislabeling them is still a broken
-// picture, so everything QCView needs to interpret a frame correctly travels
-// here — above all the working colorspace, which AE hands us for real via
-// AEGP_ColorSettingsSuite6 rather than us guessing from the bit depth.
+// The shared surface carries numbers; this struct carries how they are laid
+// out (PLAN.md D5): dimensions, stride, format, channel order, value scale,
+// flags. These are container facts — mechanical, always true, and a frame is
+// visibly broken without them. Colour *meaning* is not here: QCView's user
+// chooses the input transform. The ICC generation below is an optional hint
+// from the AEGP tap, never authoritative; the Transmit device does not set it.
 //
 // This is a wire format shared across two processes and (later) two platforms
 // and two compilers. Rules: POD only, fixed-width types, explicit padding,
@@ -18,7 +19,7 @@
 namespace qcbae {
 
 inline constexpr uint32_t kRingMagic        = 0x51434145u;  // 'QCAE'
-inline constexpr uint32_t kFrameDescVersion = 2u;   // v2: channel_order
+inline constexpr uint32_t kFrameDescVersion = 3u;   // v2: channel_order; v3: non-finite flags replace the clamp flag
 
 inline constexpr uint32_t kMaxCompName = 128u;
 
@@ -47,18 +48,18 @@ enum class SourceTier : uint32_t {
     Unknown = 0,
     Int8    = 1,   // AE 8 bpc   — exact in half
     Int16   = 2,   // AE 16 bpc  — 0..32768, lossy above ~0.031 (PLAN.md D2/D3)
-    Float32 = 3,   // AE 32 bpc  — clamped at 65504 (PLAN.md D4)
+    Float32 = 3,   // AE 32 bpc  — IEEE to half; beyond ±65504 becomes ±inf (PLAN.md D4)
 };
 
 // After Effects stores pixels as ARGB, not RGBA — PF_Pixel8/16 lead with
 // alpha and PF_PixelFloat is {alpha, red, green, blue}. Reading an AE world as
 // RGBA rotates every channel.
 //
-// The wire keeps AE's order rather than fixing it on the CPU, because the
-// swizzle is free on the GPU (a shader swizzle, or MTLTextureSwizzleChannels)
-// and paying for it on the CPU would undo the whole reason the integer tiers
-// are a memcpy (PLAN.md D1). The consumer reorders; the producer states what
-// it sent.
+// The producer states what it sent; a consumer honouring this field reorders.
+// The AEGP tap and the A4 probe send AE's native order untouched. The
+// Transmit device (A6) reorders to RGBA inside its one conversion pass,
+// because QCView's upload path has no swizzle and the pass touches every
+// pixel anyway (PLAN.md D1).
 enum class ChannelOrder : uint32_t {
     Unknown = 0,
     RGBA    = 1,
@@ -69,7 +70,10 @@ enum class ChannelOrder : uint32_t {
 enum FrameFlags : uint32_t {
     kFlagNone            = 0u,
     kFlagPremultiplied   = 1u << 0,  // alpha is premultiplied (AE's normal state)
-    kFlagClampedOverflow = 1u << 1,  // at least one sample hit the 65504 ceiling
+    // Non-finite samples are carried, never clamped (PLAN.md D4); these say a
+    // frame has some, so a consumer can show them rather than stumble on them.
+    kFlagHasInf          = 1u << 1,  // at least one ±inf (source inf, or beyond ±65504 in half)
+    kFlagHasNaN          = 1u << 2,  // at least one NaN
 };
 
 // GPU row-stride alignment. A linear texture over shared memory has a

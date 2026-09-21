@@ -21,6 +21,7 @@ endif()
 # ---------------------------------------------------------------------------
 add_library(qcbae_common STATIC
     src/common/surface/shared_ring.cpp
+    src/common/convert/half_convert.cpp
 )
 target_include_directories(qcbae_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -173,6 +174,12 @@ if(BUILD_TESTING)
         add_test(NAME ring_tearing COMMAND ring_tearing_test)
         set_tests_properties(ring_tearing PROPERTIES TIMEOUT 120)
     endif()
+
+    # The Transmit conversion pass, read back the way QCView reads it, and the
+    # portable half conversion held bit for bit to the hardware (PLAN.md D4).
+    add_executable(convert_test tests/convert_test.cpp)
+    target_link_libraries(convert_test PRIVATE qcbae_common)
+    add_test(NAME convert COMMAND convert_test)
 
     add_executable(ring_unit_test tests/ring_unit_test.cpp)
     target_link_libraries(ring_unit_test PRIVATE qcbae_common)

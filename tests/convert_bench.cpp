@@ -13,6 +13,7 @@
 // deletes the loop and the benchmark reports infinity. It did exactly that on
 // the first attempt.
 
+#include "common/convert/half_convert.h"
 #include "common/protocol/frame_desc.h"
 
 #include <chrono>
@@ -123,6 +124,26 @@ int main() {
         keep(d);
     });
 #endif
+    // The A6 product pass (src/common/convert/half_convert.*): flip a
+    // bottom-up host frame, reorder ARGB/BGRA to RGBA and convert to half —
+    // IEEE, nothing clamped (PLAN.md D4) — into a padded destination, in one
+    // pass. Compare with the plain conversion above: the flip and reorder
+    // should cost next to nothing on top of it.
+    std::printf("\nA6 Transmit pass, 4x32f host frame -> top-down RGBA16F:\n");
+    {
+        const size_t dst_stride = aligned_bytes_per_row(W, 8);
+        std::vector<uint8_t> dst(dst_stride * H);
+        for (HostOrder order : {HostOrder::ARGB, HostOrder::BGRA}) {
+            const ConvertSource cs {src32.data(), static_cast<ptrdiff_t>(W * 16), W, H, order, true};
+            bench(order == HostOrder::ARGB ? "ARGB bottom-up (AE)       -> RGBA16F"
+                                           : "BGRA bottom-up (Premiere) -> RGBA16F",
+                  N * 6, [&] { convert_32f_to_rgba16f(cs, dst.data(), dst_stride); keep(dst.data()); });
+        }
+        const ConvertSource cs {src32.data(), static_cast<ptrdiff_t>(W * 16), W, H, HostOrder::ARGB, true};
+        bench("ARGB bottom-up, portable path (fallback)", N * 6,
+              [&] { convert_32f_to_rgba16f_portable(cs, dst.data(), dst_stride); keep(dst.data()); });
+    }
+
     std::printf("\nWire bytes per 4K frame: 8bpc %.1f MB, 16bpc %.1f MB, 32bpc %.1f MB\n",
                 max_frame_bytes(W, H) / 2.0 / 1048576.0,
                 static_cast<double>(max_frame_bytes(W, H)) / 1048576.0,
