@@ -1,7 +1,8 @@
 # Handoff — Windows machine
 
 Standing instructions for the Windows side. Keep this file current; it is the
-contract between the two machines.
+contract between the two machines. The checklist of open Windows work, in both
+QCBridgeAE and QCView, is `TRACKING-windows.md`.
 
 ## Before anything builds
 
