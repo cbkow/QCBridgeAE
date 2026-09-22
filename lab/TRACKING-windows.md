@@ -198,10 +198,37 @@ its conclusions need a Windows twin before they are safe to build on.
   libavformat and should build as-is, but the Windows agent has to link an
   FFmpeg with SRT — confirm the one it ships has the protocol, the way
   QCView's vendored build does.
-- [ ] **No host-side demux leg.** The bench found QCView opens `srt://`
-  directly, so the agent should not re-expose video on local TCP. If the
-  Windows agent inherits `--video-listen` from the Kyber design, it is 15 ms
-  of pure cost.
+- [x] ~~No host-side demux leg.~~ Done 2026-09-22 on the Mac: the video lane
+  is out of the transport entirely and `video_listen` is deleted. Nothing for
+  Windows to inherit.
+
+## QCBridge — the agent after the quinn port (2026-09-22, branch `spike/quinn`)
+
+Kyber is gone; the transport is plain `quinn`. The Mac side builds, passes
+10/10 transport contract tests and 87/87 pytest. None of it has been compiled
+on Windows.
+
+- [ ] **Build the agent on Windows.** `cargo build` in `agent/`. The old
+  Rust 1.89 pin came from Kyber and can relax; the Mac builds on 1.98.1.
+  There is no `build-win.*` script and no external clone to make any more —
+  `HANDOFF-windows.md` task 4 is superseded.
+- [ ] **Run the contract tests there.** `python -m pytest -q` → expect 87
+  passed, 0 skipped. `tests/test_transport_agent.py` spawns two
+  `qcbridge-agent` processes itself, so it needs only the built binary. If it
+  *skips*, the binary was not found — that is a fail, not a pass.
+- [ ] **Check the per-instance config change.** Cert and `agent.json` now
+  derive from the config file's directory, so `--config` isolates an
+  instance. Confirm the default path still resolves to
+  `%APPDATA%\QCBridge\` and that two agents with different configs do not
+  share a certificate.
+- [ ] **21-check smoke over the agent transport**, now committed as
+  `smokes/`: `QCB_TRANSPORT=agent QCB_AGENT=spawn`. The scripts are zsh and
+  macOS-shaped (`${0:a:h}`, `/Applications/...`); a Windows equivalent is
+  its own task. `$BLENDER` overrides the binary.
+- [ ] **Re-run the transport A/B.** `bootstrap_bench.sh <w> agent 8` and
+  `... 40` against `zmq` as control. The Kyber baselines this replaced are
+  quoted in `results/2026-09-22-quinn-port/notes.md`; the directories that
+  held them were deleted.
 - [ ] **Cross-machine rungs.** Everything measured so far is loopback, where
   SRT's latency buffer looks like pure overhead. mac↔win with real loss is
   what decides how low that setting can actually go.
