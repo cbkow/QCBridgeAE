@@ -129,14 +129,22 @@ warms the byte ranges of the next ~2 s of frames from the container index.
 - [ ] `bc8ca1c4` only adds dual-decoder diagnostics (slow read, read EOF,
   empty-ring stall); nothing to port.
 
+## QCView — upload ring (branch `rotating-upload-textures`)
+
+- [ ] **Does D3D11 need a twin?** macOS landed `MetalUploadRing`: CPU frames
+  go into a ring of textures so an upload never overwrites one a frame in
+  flight samples. On macOS the old single-texture path overwrote an
+  in-flight texture 1 in ~1000 uploads at 4K60 with OCIO, and 0 at 1080p60.
+  D3D11's `UpdateSubresource` on a default-usage texture is ordered by the
+  runtime (it copies or waits as needed), so the hazard may not exist there;
+  confirm that before porting anything. The dual compositor's other change,
+  skipping the re-upload of an unchanged frame every vsync, is worth
+  checking on D3D11 regardless (`d3d11_dual_compositor.cpp`).
+
 ## Coming, not landed yet
 
 Each will need a D3D11 twin when it lands on macOS:
 
-- **Rotating upload textures.** The single CPU slot is overwritten by
-  `replaceRegion` / `UpdateSubresource` while earlier frames may still sample
-  it. D3D11's `UpdateSubresource` on a default-usage texture is ordered by the
-  runtime, so check whether the hazard exists there at all before porting.
 - **Dual live (live A, clocked B).** It also removes the stream gating from
   `eb323d05` for A.
 
