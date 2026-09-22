@@ -104,9 +104,18 @@ arrives slowly (measured on macOS: ~60–70 MB/s through LucidLink's local
 SMB gateway, shared by every reader). `ReadAhead` (`src/decode/read_ahead.*`)
 warms the byte ranges of the next ~2 s of frames from the container index.
 
-- [ ] **Build check: `e7e7995f`.** Written on macOS. The Windows-specific
-  part is `SetThreadPriority(THREAD_MODE_BACKGROUND_BEGIN)` for the worker;
-  the file reads go through `QFile` (unbuffered).
+- [ ] **Build check: `e7e7995f` and the touch rewrite after it.** Written on
+  macOS. The read-ahead now touches one byte per 1 MiB page (LucidLink's
+  cache page) rather than copying frames. The Windows-specific part is
+  `SetThreadPriority(THREAD_MODE_BACKGROUND_BEGIN)` for the worker; reads go
+  through `QFile` (unbuffered). macOS also sets `F_NOCACHE`; Windows has no
+  equivalent for a 1-byte read (`FILE_FLAG_NO_BUFFERING` needs aligned
+  sector-sized reads), so there the OS may keep the touched page, which is
+  harmless.
+- [ ] **Does LucidLink on Windows hydrate from a touch?** On macOS
+  `lucid3 cache` showed the on-disk cache grow by the file's size after a
+  touch of an uncached file. Repeat on Windows; the client may mount the
+  filespace differently.
 - [ ] **Does it help on Windows?** Open an uncached large file on a network
   share with `QCV_READAHEAD_SECONDS=0` (off) and at the default. Compare how
   quickly a paused seek and the first seconds of playback fill; the
