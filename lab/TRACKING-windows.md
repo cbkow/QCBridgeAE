@@ -14,10 +14,10 @@ dropped (with the reason).
 
 ## Getting the code
 
-- [ ] QCView branches `qcbae-live` and `metal-source-race` exist only on the
-  macOS machine (as of 2026-09-22). chris pushes; nothing below that says
-  "QCView" can start until he does. `metal-source-race` is branched from
-  `qcbae-live`.
+- [ ] QCView: everything below (the `qcbae-live`, `metal-source-race` and
+  `dual-network-read` branches, stacked) was fast-forwarded into QCView
+  `main` on 2026-09-22, at `d23bbf05`. It is local to the macOS machine
+  until chris pushes. Branch names below say where each item was developed.
 
 ## QCBridgeAE — phase A5 (PLAN.md)
 
