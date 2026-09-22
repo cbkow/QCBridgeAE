@@ -70,6 +70,31 @@ The producer side, so this comes first.
   drag and drop of URLs, New Project, the live guards): run the media matrix
   from `lab/results/2026-09-21-a3-qcview-ingest/` on Windows.
 
+## QCView — the Windows build is broken on main (found 2026-09-22)
+
+A pre-release audit of QCView `main` found the Windows half of the 2.3.4 diff
+has never been compiled — there is no CI, and both of these went in from the
+Mac.
+
+- [ ] **Confirm the `NOMINMAX` fix.** `src/decode/read_ahead.cpp` included
+  `<windows.h>` with no guard while calling `std::min`/`std::max` with plain
+  arguments in four places, so MSVC could not compile it: windows.h defines
+  those as function-like macros. Fixed on the Mac by the same
+  `WIN32_LEAN_AND_MEAN` + `NOMINMAX` idiom every other file here uses — but
+  fixed blind. **A Windows build is the only thing that proves it**, and it is
+  the first thing to try, because nothing else in the file has ever been
+  compiled either.
+- [ ] **The read-ahead may be inert on Windows.** `read_ahead.cpp` uses
+  `SetThreadPriority(THREAD_MODE_BACKGROUND_BEGIN)`, which throttles I/O far
+  harder than macOS's `IOPOL_UTILITY`. Check the `ReadAhead: … window warm`
+  log actually reports a useful fetch rate rather than crawling.
+- [ ] **Live in dual freezes a D3D11-decoded side.** `DualFrame` has `Cpu`,
+  `Metal` and `Vulkan` kinds but no D3D11 one, so
+  `dual_live_source.cpp:186-190` falls through to `default:` and the side
+  holds its previous frame for ever, silently. An SRT stream decoded through
+  D3D11VA on one side of dual is the case. Needs either a D3D11 `DualFrame`
+  kind or an honest status instead of a frozen picture.
+
 ## QCView — threading fixes (branch `metal-source-race`)
 
 Found with a ThreadSanitizer build on macOS. MSVC has no TSan, so on Windows
@@ -78,7 +103,13 @@ the check is a long harness run plus the real-app dual matrix.
 switches media, enters and leaves dual and trims the timeline, then quits.
 `QCV_SWITCH_SEED` replays a sequence; macOS used seed 3222196691.
 
-- [ ] **Build and test `9c3874f6`: the D3D11 teardown handshake.** Written on
+- [ ] **Build and test `9c3874f6`: the D3D11 teardown handshake.** RELEASE
+  BLOCKER for a cross-platform 2.3.4 — its own commit message says "Build and
+  run the dual matrix on Windows before merging", and it was merged anyway.
+  The Metal original was validated under TSan with a 321-step replay; this
+  port has zero minutes of runtime, and it holds `sourceMutex` across a whole
+  draw with a lock order (`d3d11_player_renderer.cpp:294`) that has never been
+  exercised. A deadlock here hangs the app. Written on
   macOS and never compiled. `Impl::sourceMutex` is held around
   `consumeLatestVideoFrame` and each draw, released just before `Present`;
   the source setters take it. Check: no deadlock under `--switch-test`, no
