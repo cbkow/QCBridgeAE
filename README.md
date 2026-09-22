@@ -22,14 +22,73 @@ free** — that's intentional.
 
 ---
 
-**Status:** experimental, not usable yet. The shared-memory transport and an
-AE test tap are done and measured (bit-exact at 8 and 16 bpc, over-range
-intact); the Transmit device and QCView's side are next. See the phase table in
-`PLAN.md`.
+**Status:** working on **macOS**, experimental. After Effects and Premiere Pro
+frames reach QCView live, measured end to end (values arrive as the host
+sent them, rounded only from 32-bit float to half; 4K preview at 24 fps). Needs a QCView build with QCBridge
+support (QCView-Player branch `qcbae-live`, not yet released). Windows and
+installers are next — see the phase table in `PLAN.md`.
 
-**Requirements (dev):** the Adobe After Effects SDK, and the Premiere Pro SDK
-(for the Transmit device). Neither is included — they're Adobe Confidential. Put
-your own copies in `private/`.
+## Setup (macOS)
+
+**1. Install the device.** Build `qcbae-transmit` (below) and copy
+`build/QCBridgeAE-Transmit.bundle` into
+
+```
+/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/QCBridgeAE/
+```
+
+That folder is writable without admin rights, and both After Effects and
+Premiere Pro load Transmit devices from it. Restart the host after
+installing.
+
+**2. Enable it in After Effects:** *Settings → Video Preview*
+- tick **Enable Mercury Transmit**, then tick **QCBridgeAE → QCView**;
+- **untick "Disable video output when in the background"**. With it ticked
+  (the default), After Effects stops sending the moment you click into
+  QCView — QCView shows *PAUSED* and names this setting.
+
+**3. Enable it in Premiere Pro:** *Settings → Playback* — the same two ticks,
+and the same background setting to untick.
+
+**4. In QCView:** *File → Connect to After Effects* (or *Connect to Premiere
+Pro*). The source appears in the Live bin as **QCBridge After Effects** /
+**QCBridge Premiere Pro** and waits until the host is sending.
+
+**5. Set QCView's OCIO input to your project's working space.** The pixels
+arrive in the host's working colour space, untransformed — nothing upstream
+converts or guesses. With Adobe colour management, that is the project's
+working space; with OCIO colour management, the OCIO working space (e.g.
+ACEScg).
+
+**What to expect**
+- Frames are RGBA16F. The host sends 32-bit float; values above 1.0 and
+  negatives are kept, and nothing is clamped — a frame containing inf or NaN
+  (usually a broken effect or expression) is flagged in QCView's live strip.
+- After Effects flattens transparency over the **comp background colour**, so
+  its frames are opaque. Premiere carries **straight alpha**.
+- After Effects sends a frame whenever its viewer updates and plays previews
+  in real time; it sends no timecode. Premiere sends its sequence time with
+  every frame.
+- Only one After Effects and one Premiere at a time: each host has one fixed
+  feed.
+
+## Building
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build
+```
+
+If linking fails with `tapi error: unknown architecture`, your Command Line
+Tools ship a newer macOS SDK than their linker can read; pin the older one
+with `-DCMAKE_OSX_SYSROOT=…/MacOSX26.5.sdk` (details in QCView-Player's
+`dependencies.md`, "Toolchain note").
+
+**Requirements (dev):** the Adobe After Effects SDK and the Premiere Pro SDK.
+Neither is included — they're Adobe Confidential. Put your own copies in
+`private/sdk/` as `AfterEffectsSDK/` and `PremiereProSDK/` (see `PLAN.md`
+§Privacy). Without them, the transport and its tests still build.
 
 ---
 
