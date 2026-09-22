@@ -1,10 +1,10 @@
 # Tracking — what Windows still owes
 
-The running list of Windows work, in both QCBridgeAE and QCView. The macOS
-side adds an item whenever it lands something that Windows has to build,
-port or verify. The Windows side ticks it off with a pointer to its evidence
-(a `lab/results/` folder, a commit). `HANDOFF-windows.md` is the standing
-instructions; this file is the checklist.
+The running list of Windows work across all three repos: QCView, QCBridgeAE
+and QCBridge. The macOS side adds an item whenever it lands something that
+Windows has to build, port or verify. The Windows side ticks it off with a
+pointer to its evidence (a `lab/results/` folder, a commit).
+`HANDOFF-windows.md` is the standing instructions; this file is the checklist.
 
 Same rule as the rest of `lab/`: public. No job names, no user paths, no
 client pixels.
@@ -12,12 +12,55 @@ client pixels.
 Status: `[ ]` open, `[~]` in progress, `[x]` done (with evidence), `[-]`
 dropped (with the reason).
 
+## The goal: one coordinated release (decided 2026-09-22)
+
+**Nothing ships until all three are built and released together.** QCView
+2.3.4 is cut and ready on macOS but is *waiting for Windows*; the two bridges
+go out with it. So there is no time pressure — the point is that a user never
+has a QCView that speaks to a bridge they cannot install, or a bridge built
+against a QCView that has not shipped.
+
+Practical consequence for the Windows side: **a green build is not the bar.
+Run the thing.** Two items already on this list were written on the Mac and
+merged with "test on Windows before merging" unfulfilled, and one of them
+(`read_ahead.cpp`) would not even compile. Assume nothing here has been
+exercised on Windows unless an item says who exercised it.
+
+### Suggested order
+
+1. **QCView first, because it is the blocker with a known compile error.**
+   Get it building, then `9c3874f6`'s dual matrix. Everything else in QCView
+   is verification of already-merged work.
+2. **QCBridgeAE A5** next — the producer side, and QCView's live path has
+   nothing to read on Windows until the ring is ported.
+3. **QCBridge (Blender) agent** last of the three. It is the newest and the
+   most self-contained: a Rust build plus a test suite that spawns its own
+   agents, so it can be judged without the other two.
+
+### What the machine needs
+
+- **MSVC toolchain** and CMake, for QCView and QCBridgeAE.
+- **Rust** (rustup, MSVC toolchain) for QCBridge's agent. The old 1.89 pin
+  came from Kyber and is gone; the Mac builds on 1.98.1. There is no external
+  clone to fetch any more.
+- **Python with pytest** for QCBridge's suite (`pyzmq` too, for the frozen
+  zmq transport tests).
+- **Blender 5.2** for the QCBridge smoke suites.
+- An **NVIDIA GPU** for the NVENC paths (A5, and QCBridge S7 later).
+
 ## Getting the code
 
-- [ ] QCView: everything below (the `qcbae-live`, `metal-source-race` and
-  `dual-network-read` branches, stacked) was fast-forwarded into QCView
-  `main` on 2026-09-22 (now at `597559df`, with the upload ring). It is local to the macOS machine
-  until chris pushes. Branch names below say where each item was developed.
+- [ ] **QCView** `main`: everything below (`qcbae-live`, `metal-source-race`,
+  `dual-network-read`, `rotating-upload-textures`, stacked) was
+  fast-forwarded into `main` on 2026-09-22. Branch names below say where each
+  item was developed. Pull `main`; one fix commit may still be local to the
+  Mac.
+- [ ] **QCBridgeAE** `main`: this repo. A1–A4, A6 and A3 are done; A5 and A7
+  are what Windows owes.
+- [ ] **QCBridge** (the Blender bridge): the agent and the quinn transport
+  live on the **`spike/quinn`** branch, not `main`. `main` is the released
+  zmq-only addon (0.1.6) and is deliberately frozen. Do not look for `agent/`
+  on `main` — it is not there.
 
 ## QCBridgeAE — phase A5 (PLAN.md)
 
@@ -264,13 +307,84 @@ on Windows.
   SRT's latency buffer looks like pure overhead. mac↔win with real loss is
   what decides how low that setting can actually go.
 
+## Packaging and shipping — the actual release gate (2026-09-22)
+
+Building is not releasing. Each of the three has to produce something a user
+can install on Windows, and none of that exists yet. This is the section that
+decides when the coordinated release can happen.
+
+### QCView
+
+- [ ] **A Windows package that installs on a clean machine.** The macOS half
+  was rebuilt and proven this session (signed, notarized, stapled, 124 MB —
+  `scripts/RELEASE.md` in that repo). There is no Windows equivalent of
+  `sign-and-notarize.sh`. Decide MSIX or a plain installer, and whether it is
+  signed.
+- [ ] **Does Sparkle's Windows story matter?** The macOS build auto-updates
+  through the appcast at `https://qcview.app/appcast.xml`. If Windows has no
+  update channel, say so in the release rather than leaving users to discover
+  it.
+
+### QCBridgeAE — phase A7
+
+- [ ] **Sign the Transmit bundle and build an installer.** Today, on both
+  platforms, the plugin is copied into MediaCore by hand and is unsigned.
+  A7's exit criterion is "installs clean on a machine that has never seen the
+  SDK". macOS is untouched too, so this is a shared piece of work, not a
+  Windows-only one — but Adobe's plugin loading is stricter on Windows and
+  worth checking early.
+- [ ] **Where the plugin goes on Windows.** The macOS path is
+  `/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/`. Confirm
+  the Windows equivalent and whether it needs admin.
+
+### QCBridge (Blender)
+
+- [ ] **Bundle the agent binary with the extension.** `find_agent` in
+  `qcbridge/ring1/transport_agent.py` already looks in `qcbridge/bin/` first,
+  before the cargo build dirs — that is the shipping path and nothing puts a
+  binary there yet. One per platform.
+- [ ] **Autostart the agent at login.** The design calls for a Windows logon
+  task **in the interactive user session, not a service** — it launches
+  Blender, which needs a desktop. macOS gets a login item. Neither exists.
+- [ ] **Sign the agent.** Unsigned binaries that open listening sockets and
+  launch other programs are exactly what endpoint protection objects to.
+- [ ] **Which addon version ships, and from which branch?** `main` is the
+  released zmq-only 0.1.6. Everything — the agent, quinn, native capture —
+  is on `spike/quinn`, now well ahead. **This is an open decision, not a
+  task**: either merge the agent line to `main` and cut an 0.2.0 once Windows
+  passes, or keep `main` as the zmq release branch and treat the agent as a
+  separate product. Nothing else in this section can be finished until it is
+  settled.
+- [ ] **The pyzmq wheel matrix.** The frozen zmq transport still needs a
+  wheel per Python version in `qcbridge/wheels/`. The agent path is
+  stdlib-only and needs none — so if the agent becomes the default, most of
+  that matrix can go.
+
 ## Coming, not landed yet
 
-Each will need a D3D11 twin when it lands on macOS:
+Each will need a D3D11 twin when it lands on macOS. Nothing is queued here
+right now — dual live landed on 2026-09-22 and has its own section above.
 
-- **Dual live (live A, clocked B).** It also removes the stream gating from
-  `eb323d05` for A.
+- *(empty)*
+
+## Parked on the macOS side — not Windows work, but do not be surprised by it
+
+- **Zero-copy ingest** (QCBridgeAE). Measured 2026-09-22 and parked: saves
+  ~3–5 ms of CPU per 4K frame, nothing visible, and would need ring protocol
+  v4. If Windows measures something very different, that is worth saying.
+- **A/B follow mode** (QCView) — a B reference that follows the host
+  playhead. Its own project, after the release.
+- **QCBridge native capture, S7** — DDA/WGC → NVENC inside the agent, the
+  Windows twin of the Swift `qcb-capture-mac`. The agent already prefers a
+  `qcb-capture-win.exe` sitting beside it (`native_capture_argv` in
+  `agent/src/main.rs`), so the hook exists and the binary does not. This is
+  the largest single piece of Windows work still ahead, and it is **not** a
+  release blocker: the ffmpeg capture path still works.
 
 ## Done
 
-(nothing yet)
+- [x] **QCBridgeAE A1–A4, A6, A3** — macOS. Listed for orientation, not as
+  Windows work.
+- [x] **QCBridge: Kyber removed, transport on plain quinn** (2026-09-22,
+  macOS). 10/10 transport contract tests, 21/21 sync smoke, bootstrap A/B at
+  parity with Kyber. The Windows verification of it is open, above.
