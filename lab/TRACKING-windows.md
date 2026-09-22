@@ -97,6 +97,25 @@ switches media, enters and leaves dual and trims the timeline, then quits.
 - [ ] Long run: `--switch-test 600` on a Release build with the Windows media
   set. Pass = no crash, no hang, and "done" logged.
 
+## QCView — network read-ahead (branch `dual-network-read`)
+
+Branched from `metal-source-race`. On a network volume an uncached frame
+arrives slowly (measured on macOS: ~60–70 MB/s through LucidLink's local
+SMB gateway, shared by every reader). `ReadAhead` (`src/decode/read_ahead.*`)
+warms the byte ranges of the next ~2 s of frames from the container index.
+
+- [ ] **Build check: `e7e7995f`.** Written on macOS. The Windows-specific
+  part is `SetThreadPriority(THREAD_MODE_BACKGROUND_BEGIN)` for the worker;
+  the file reads go through `QFile` (unbuffered).
+- [ ] **Does it help on Windows?** Open an uncached large file on a network
+  share with `QCV_READAHEAD_SECONDS=0` (off) and at the default. Compare how
+  quickly a paused seek and the first seconds of playback fill; the
+  `ReadAhead: … window warm` log lines give the fetch rate. Background mode
+  also lowers I/O priority on Windows; check that it doesn't starve the
+  read-ahead on an idle machine.
+- [ ] `bc8ca1c4` only adds dual-decoder diagnostics (slow read, read EOF,
+  empty-ring stall); nothing to port.
+
 ## Coming, not landed yet
 
 Each will need a D3D11 twin when it lands on macOS:
