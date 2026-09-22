@@ -44,6 +44,24 @@ unpushed). macOS 26.7, Apple Silicon. Plan: `PLAN-A3.md`.
 - **After Effects and Premiere through QCView:** confirmed by eye by chris
   ("both work wonderfully").
 
+## Measured with the real hosts (2026-09-22)
+
+AE 2026 scratch project (OCIO/ACEScg), QCView branch build connected via
+`qcbae://ae` / File ▸ Connect to Premiere Pro.
+
+| Check | Result |
+| --- | --- |
+| AE values | Static solids comp, centre (640,360) = the 50% (0.8,0.4,0.2) solid flattened over black at 8 bpc. **QCView's logged sample, the `/qcbae-ae` ring, and the expected nearest halves of 102/255, 51/255, 26/255 all equal (0.399902, 0.199951, 0.101990, 1.0).** |
+| inf / NaN | White square, Exposure +20 stops with linear-light conversion bypassed, **32 bpc** project (8 bpc clamps at 1.0 before any inf can form). Device logged `has inf`; ring holds **R=G=B=inf**, not 65504; frame flagged; the rest of the frame untouched (blue now 0.099976 = half of an exact 0.1). **QCView shows the "inf/NaN in frame" badge**; the square draws white (SDR, OCIO off). |
+| Paused hint | AE's "Disable video output when in the background" ticked: focus loss sent `ApplicationLostFocus` / video off → ring PausedFocus → **QCView PAUSED with the preference hint**, last frame held. |
+| 4K playback | 8 bpc 4K comp, cached preview: **24.00 fps into QCView**; ring copy **2.81 ms mean / 6.7 ms max** (66 MB/frame, ~24 GB/s — twice the plan's 1.5 ms estimate); QCView process **0.39 cores** total. |
+| Premiere | Straight alpha arrives and blends: QCView centre = ring = (0.799805, 0.399902, 0.199951, **0.501953**). Scrubbing arrives at fractional resolution (640×360, copy 0.2 ms). chris: "tight with timing … plays down great". |
+| Stale ring, for real | QCView first opened a `/qcbae-premiere` left by the **previous day's** Premiere (pid dead — Premiere doesn't unlink on quit either), recognised it, and attached to the new Premiere the moment it published. |
+
+Open from this: with OCIO engaged, some transforms may turn inf into NaN
+(inf−inf, 0×inf in a matrix) — worth checking when QCView handles
+non-finite values deliberately.
+
 ## Pre-existing QCView issues found and fixed on the branch
 
 Stale final live frame after stop; sticky range override applied to live;
@@ -56,10 +74,6 @@ before and after).
 
 ## Open
 
-- **Measured checks with the real hosts** (only visual so far): ring-vs-
-  QCView centre-sample comparison for AE and Premiere; the Paused hint with
-  AE's background preference ticked; the inf/NaN badge from a comp that
-  produces one; 4K AE playback through QCView (fps, reader copy cost).
 - **Zero-copy into QCView** (texture over the ring slot) — the copy is v1.
 - **Metal source-state race** (pre-existing, not live-specific): media-switch
   setters write render-thread state unlocked. Parked for a ThreadSanitizer
