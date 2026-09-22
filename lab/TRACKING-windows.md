@@ -141,6 +141,25 @@ warms the byte ranges of the next ~2 s of frames from the container index.
   skipping the re-upload of an unchanged frame every vsync, is worth
   checking on D3D11 regardless (`d3d11_dual_compositor.cpp`).
 
+## QCView — live sources in dual view (branch `dual-live`)
+
+Branched from `main` after the upload ring. A live side is a `DualLiveSource`
+(`src/dual/dual_live_source.*`): it owns its own receiver and hands its latest
+frame back for any master frame. Live can be either side or both; two live
+sides have no clock (`dualSeekable` false) and the transport hides.
+
+- [ ] **Build check.** New file in `qcv_dual`; `LiveSource::setSink` now takes
+  a `LiveFrameSink*` (`decode/live_source.h`), which `VideoDecoder`
+  implements. `DualLiveSource` has a `Q_OS_WIN` branch that clones a Vulkan
+  AVFrame the way `DualVideoDecoder` does; that path has never been compiled.
+- [ ] **srt:// in dual on Windows.** `qcbae://` stays macOS-only until the
+  ring port above, but SRT works on both: put a stream on one side and a file
+  on the other, check the file side still drives the transport and the live
+  side updates. D3D11 renders on demand, so the frame-available callback is
+  what wakes it — if the live side only repaints when you move the mouse,
+  that callback is not reaching the renderer.
+- [ ] **Live + live**: transport and timeline hidden, both sides updating.
+
 ## Coming, not landed yet
 
 Each will need a D3D11 twin when it lands on macOS:
