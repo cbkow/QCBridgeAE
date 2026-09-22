@@ -143,7 +143,8 @@ warms the byte ranges of the next ~2 s of frames from the container index.
 
 ## QCView — live sources in dual view (branch `dual-live`)
 
-Branched from `main` after the upload ring. A live side is a `DualLiveSource`
+Merged into QCView `main` on 2026-09-22 (verified on macOS with the real
+hosts). A live side is a `DualLiveSource`
 (`src/dual/dual_live_source.*`): it owns its own receiver and hands its latest
 frame back for any master frame. Live can be either side or both; two live
 sides have no clock (`dualSeekable` false) and the transport hides.
