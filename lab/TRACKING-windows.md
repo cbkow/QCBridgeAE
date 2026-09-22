@@ -307,6 +307,59 @@ on Windows.
   SRT's latency buffer looks like pure overhead. mac↔win with real loss is
   what decides how low that setting can actually go.
 
+## QCBridge — discovery and runtime settings (2026-09-22, branch `spike/quinn`)
+
+The agent now finds replicas three ways — a unicast probe to `host:4246`
+(the VPN path, primary), a shared-storage phonebook, and multicast on
+`239.42.0.4:4246` — and takes settings at runtime (`set_config`, a tray
+Network submenu). All of it built and proven on the Mac only. The group and
+port continue the studio family (MinRender `.1:4243`, UFB `.2:4244`/`.3:4245`)
+so the beacons read as siblings; do not move them.
+
+- [ ] **The beacon socket.** `agent/src/discovery.rs::bind_udp` mirrors UFB's
+  Rust `udp_notify.rs` (socket2: `SO_REUSEADDR`, bind `0.0.0.0:4246`, join
+  the group, TTL 1, multicast loop on) plus `SO_REUSEPORT`, which is
+  `#[cfg(unix)]` — Windows has no such option and `SO_REUSEADDR` alone means
+  something different there. Confirm a replica can bind 4246 while UFB or
+  MinRender are running on the same machine, and that a unicast probe from
+  another box gets an answer. **Windows Firewall will block inbound
+  UDP/4246 until a rule exists** — MinRender's installer adds one for its
+  own port (`installer/minrender_installer.iss`); the agent needs the same.
+- [ ] **Only replicas answer on 4246 — by design, keep it that way.** Two
+  sockets sharing the port with reuse both get multicast but a unicast
+  probe reaches only one; a host on the port silently ate probes meant for
+  the replica beside it on the Mac. If Windows delivery differs, that is
+  worth a line in the notes, not a reason to let hosts bind.
+- [ ] **The machine name.** `config::machine_name()` reads `COMPUTERNAME`
+  on Windows (libc `gethostname` elsewhere). Confirm it is set in the
+  interactive session the agent will run in — it is, normally — and that a
+  name with spaces or Unicode survives into the phonebook filename
+  (`entry_name` replaces anything non-alphanumeric with `_`).
+- [ ] **The phonebook on a share.** `phonebook = "<dir>"` writes
+  `<dir>/qcbridge/<name>.json` by temp-file-then-rename. Check that rename
+  is atomic enough on the SMB path the studio uses (it is what MinRender
+  relies on already), that a UNC path and a mapped drive both work, and
+  that a stale entry from a machine that crashed is dropped after 60 s
+  rather than offered.
+- [ ] **`pid_alive` returns `None` on Windows**, so the single-instance guard
+  cannot refuse a second agent there: it needs `OpenProcess(SYNCHRONIZE)` +
+  `WaitForSingleObject(h, 0)` via `windows-sys`. Same answer as the
+  QCBridgeAE ring's liveness item above; do them together.
+- [ ] **The tray on Windows.** Never run there. Checkable items, a submenu
+  and `set_tooltip` are all supported by muda/tray-icon on Windows, and
+  muda's premature check-toggle is in its Windows backend too (the handler
+  already sets all three by id). Click through Off / Direct / Discoverable
+  and confirm the TOML changes and the addon panel follows.
+- [ ] **`find_agent` picks the newest cargo build by mtime.** A stale
+  `target/release` once shadowed a fresh `debug` and the contract tests
+  passed against an agent that did not know `set_config`. If a Windows run
+  ever shows `unknown cmd` in `<base>/host-agent.log`, check which binary
+  was spawned before anything else.
+- [ ] **Run it:** `cargo build --release` in `agent/`, then
+  `python -m pytest -q` → 89 passed, 0 skipped, including
+  `test_set_config_round_trip_and_needs_restart` and
+  `test_discover_by_direct_probe_finds_the_replica`.
+
 ## Packaging and shipping — the actual release gate (2026-09-22)
 
 Building is not releasing. Each of the three has to produce something a user
