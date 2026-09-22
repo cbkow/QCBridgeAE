@@ -161,6 +161,25 @@ sides have no clock (`dualSeekable` false) and the transport hides.
   that callback is not reaching the renderer.
 - [ ] **Live + live**: transport and timeline hidden, both sides updating.
 
+## QCView — packaging changes that touch Windows (2026-09-22)
+
+The macOS release flow was rebuilt (`scripts/`, committed now — it used to be
+gitignored, which is how the originals were lost with the old Mac). Three of
+those changes are not macOS-only:
+
+- [ ] **The log moved out of the app bundle.** `installFileLogger` wrote next
+  to the executable, which on Windows is `Program Files` — never writable, so
+  released builds almost certainly had no log at all. It is now
+  `%LOCALAPPDATA%/QCView/logs/` (`QCV_LOG_DIR` overrides). Confirm a packaged
+  Windows build actually writes there.
+- [ ] **Qt Multimedia was dropped** from `find_package` (nothing used it).
+  windeployqt should stop shipping Qt's media plugin and its FFmpeg; check the
+  MSIX shrinks and nothing breaks.
+- [ ] **Pruning.** `scripts/prune_bundle.sh` is macOS-shaped (frameworks,
+  otool). If windeployqt is as generous as macdeployqt was — it deployed Qt3D,
+  PDF, the virtual keyboard and a second FFmpeg — the Windows package may
+  deserve the same treatment.
+
 ## Coming, not landed yet
 
 Each will need a D3D11 twin when it lands on macOS:
