@@ -16,7 +16,7 @@ dropped (with the reason).
 
 - [ ] QCView: everything below (the `qcbae-live`, `metal-source-race` and
   `dual-network-read` branches, stacked) was fast-forwarded into QCView
-  `main` on 2026-09-22, at `d23bbf05`. It is local to the macOS machine
+  `main` on 2026-09-22 (now at `597559df`, with the upload ring). It is local to the macOS machine
   until chris pushes. Branch names below say where each item was developed.
 
 ## QCBridgeAE — phase A5 (PLAN.md)
