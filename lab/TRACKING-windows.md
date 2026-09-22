@@ -122,6 +122,10 @@ warms the byte ranges of the next ~2 s of frames from the container index.
   `ReadAhead: … window warm` log lines give the fetch rate. Background mode
   also lowers I/O priority on Windows; check that it doesn't starve the
   read-ahead on an idle machine.
+- [ ] **Loop-range hydration** (commit after `b116e372`): loop on + in/out
+  set touches the whole range, in single and dual. Shared code; verify the
+  `ReadAhead: … loop range … touched` log line appears and the range plays
+  smoothly on the next pass.
 - [ ] `bc8ca1c4` only adds dual-decoder diagnostics (slow read, read EOF,
   empty-ring stall); nothing to port.
 
