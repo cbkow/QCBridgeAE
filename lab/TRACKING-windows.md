@@ -180,6 +180,32 @@ those changes are not macOS-only:
   PDF, the virtual keyboard and a second FFmpeg — the Windows package may
   deserve the same treatment.
 
+## QCBridge — transport, after the mux-tax bench (2026-09-22)
+
+The Blender sister repo is dropping Kyber for quinn on the control lanes and
+keeping SRT for video. The bench that settled the video question
+(`spikes/parity/mux-tax/`, results in
+`spikes/parity/results/2026-09-22-mux-tax/`) ran on the Mac only, and two of
+its conclusions need a Windows twin before they are safe to build on.
+
+- [ ] **Re-run the ladder on Windows.** `qcb-stamp` is VideoToolbox, so the
+  Windows side needs an NVENC equivalent feeding the same unmodified
+  `probe_reader.py`. The prize is the pairwise deltas, not the absolutes:
+  does a process hop cost ~18 ms there too, and is SRT's latency setting 1:1?
+  The 2026-09-17 `win-loopback` runs already say yes to the second
+  (91 → 191 for 20 → 120); the first is untested off the Mac.
+- [ ] **In-process mux on Windows.** `muxsend.c` is portable C against
+  libavformat and should build as-is, but the Windows agent has to link an
+  FFmpeg with SRT — confirm the one it ships has the protocol, the way
+  QCView's vendored build does.
+- [ ] **No host-side demux leg.** The bench found QCView opens `srt://`
+  directly, so the agent should not re-expose video on local TCP. If the
+  Windows agent inherits `--video-listen` from the Kyber design, it is 15 ms
+  of pure cost.
+- [ ] **Cross-machine rungs.** Everything measured so far is loopback, where
+  SRT's latency buffer looks like pure overhead. mac↔win with real loss is
+  what decides how low that setting can actually go.
+
 ## Coming, not landed yet
 
 Each will need a D3D11 twin when it lands on macOS:
