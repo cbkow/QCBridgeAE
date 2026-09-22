@@ -171,6 +171,12 @@ if(APPLE)
     target_link_libraries(qcbae-gpubench PRIVATE qcbae_common
         "-framework Metal" "-framework Foundation")
     target_compile_options(qcbae-gpubench PRIVATE -fobjc-arc)
+
+    # QCView's copy-and-upload ingest against sampling the slot in place.
+    add_executable(qcbae-ingestbench tests/ingest_bench.mm)
+    target_link_libraries(qcbae-ingestbench PRIVATE
+        "-framework Metal" "-framework Foundation")
+    target_compile_options(qcbae-ingestbench PRIVATE -fobjc-arc)
 endif()
 
 include(CTest)

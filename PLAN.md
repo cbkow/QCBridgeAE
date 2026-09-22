@@ -315,9 +315,14 @@ stride. Live status, reconnect and hold-last-frame-on-dropout come with it.
 - Nothing downstream swizzles channels or applies a scale, so the plugin
   delivers RGBA, and the 16u range question is settled in A4 (D1's Transmit
   note). 8u and 16u already have CPU-slot formats; only 16F is new.
-- **For zero-copy on Apple Silicon**, the ring reader should wrap the slot as a
-  texture (A1b) rather than hand `replaceRegion` a `QImage` view. The
-  `cpuShared` route above is the quick first cut.
+- **Zero-copy ingest is parked (measured 2026-09-22,
+  `lab/results/2026-09-22-zero-copy-assessment/`).** Sampling the slot in place
+  would save 3–5 ms of CPU per 4K frame and nothing a user can see. It
+  would also cost a ring protocol change: one reader claim cannot cover a slot
+  that frames in flight are still sampling. The copy stays, but it moves: one
+  copy, from the ring into rotating textures, off the render thread. Revisit
+  at 8K or high frame rates, where the render-thread upload reaches a 120 Hz
+  refresh.
 
 **Facts that bound the design:**
 - **16F is QCView's floor.** The source is bilinear-resampled into a
@@ -332,8 +337,9 @@ stride. Live status, reconnect and hold-last-frame-on-dropout come with it.
 - Over-range survives to an EDR / scRGB swapchain from a 16F source; SDR
   swapchains clamp.
 - QCView's CPU slot uploads with `replaceRegion` / `UpdateSubresource` into its
-  own texture, so the A1b zero-copy does not carry through this path. At ~1 ms
-  a 4K frame it isn't worth chasing in v1.
+  own texture, so the A1b zero-copy does not carry through this path. Measured
+  at 4K: 0.95 ms ring → `QImage`, then 2.3 ms `replaceRegion` on the render
+  thread (8.2 ms at 8K).
 
 **Liveness is the consumer's job (A6).** AE quits without unloading the
 device, so the ring is never marked Retired and never unlinked: it survives,

@@ -1,0 +1,5 @@
+{"run":"ingest-bench","device":"Apple M5 Max","os":"macOS 26.7","w":1920,"h":1080,"canvas":"1920x1080","copy1_ms":0.23,"copy2_replaceRegion_ms":0.50,"gpu_resample_copied_ms":0.07,"gpu_resample_inplace_ms":0.09,"same_memory":true}
+{"run":"ingest-bench","device":"Apple M5 Max","os":"macOS 26.7","w":3840,"h":2160,"canvas":"3840x2160","copy1_ms":0.95,"copy2_replaceRegion_ms":2.28,"gpu_resample_copied_ms":0.54,"gpu_resample_inplace_ms":0.21,"same_memory":true}
+{"run":"ingest-bench","device":"Apple M5 Max","os":"macOS 26.7","w":3840,"h":2160,"canvas":"1920x1080","copy1_ms":0.95,"copy2_replaceRegion_ms":2.29,"gpu_resample_copied_ms":0.51,"gpu_resample_inplace_ms":0.22,"same_memory":true}
+{"run":"ingest-bench","device":"Apple M5 Max","os":"macOS 26.7","w":7680,"h":4320,"canvas":"3840x2160","copy1_ms":3.84,"copy2_replaceRegion_ms":8.18,"gpu_resample_copied_ms":1.33,"gpu_resample_inplace_ms":0.82,"same_memory":true}
+{"run":"a3-in-app","source":"After Effects 4K preview","copy1_ms_mean":2.81,"copy1_ms_max":6.7,"fps":24.0,"qcview_cores":0.39,"note":"from 2026-09-21-a3-qcview-ingest; copy 2 not instrumented in the app"}
