@@ -286,7 +286,7 @@ those changes are not macOS-only:
   PDF, the virtual keyboard and a second FFmpeg — the Windows package may
   deserve the same treatment.
 
-  *Windows 2026-09-23:* measured on the 2.3.4 MSIX: 466 MB uncompressed. FFmpeg 180 MB is one copy (avcodec 118, avfilter 36, avformat 22) — no second FFmpeg, no Qt3D, no virtual keyboard, no Qt Multimedia. Prunable: `opengl32sw.dll` 21 MB (software GL; the renderer is D3D11), `dxcompiler.dll` 22 MB (check whether Qt RHI needs it at run time), `Qt6Pdf.dll` 4.6 MB, the unused Quick Controls styles (Imagine, Material, Universal, Fluent, ~10 MB), `qmltooling/` 1 MB, and exiftool's library tree shipped twice (`assets/exiftool/exiftool_files/lib` 34 MB and `assets/exiftool/lib` 20 MB). ~80 MB uncompressed to take out; a Windows `prune_bundle` twin.
+  *Windows 2026-09-23:* measured on the 2.3.4 MSIX: 466 MB uncompressed. FFmpeg 180 MB is one copy (avcodec 118, avfilter 36, avformat 22) — no second FFmpeg, no Qt3D, no virtual keyboard, no Qt Multimedia. Prunable: `opengl32sw.dll` 21 MB (software GL; the renderer is D3D11), `dxcompiler.dll` 22 MB (check whether Qt RHI needs it at run time), `Qt6Pdf.dll` 4.6 MB, the unused Quick Controls styles (Imagine, Material, Universal, Fluent, ~10 MB), `qmltooling/` 1 MB, and exiftool's library tree shipped twice (`assets/exiftool/exiftool_files/lib` 34 MB and `assets/exiftool/lib` 20 MB). Done the same afternoon: `installer/msix/build_msix.ps1` prunes after staging (`--no-opengl-sw` plus a list; `-NoPrune` keeps it all), QCView `13dbb081`: **62 MB out, 141 MB packed against 165 for 2.3.3**. `d3dcompiler_47` stays (the D3D11 renderer's HLSL compile).
 ## QCBridge — transport, after the mux-tax bench (2026-09-22)
 
 The Blender sister repo is dropping Kyber for quinn on the control lanes and
@@ -540,7 +540,7 @@ decides when the coordinated release can happen.
   `scripts/RELEASE.md` in that repo). There is no Windows equivalent of
   `sign-and-notarize.sh`. Decide MSIX or a plain installer, and whether it is
   signed.
-  *Windows 2026-09-23:* `cmake --build build-release --target qcview_msix` works on this box (MakeAppx + SignTool from the 26100 SDK, windeployqt 6.11.1): `installer/msix/dist/QCView-2.3.4-win64.msix`, 173 MB, **unsigned** — the sideload signature needs `QCV_SIGNING_PFX` set, and signing is the owner's call. Not yet installed on a clean machine.
+  *Windows 2026-09-23:* `cmake --build build-release --target qcview_msix` works on this box (MakeAppx + SignTool from the 26100 SDK, windeployqt 6.11.1): `installer/msix/dist/QCView-2.3.4-win64.msix`, 173 MB, **unsigned** — the sideload signature needs `QCV_SIGNING_PFX` set, and signing is the owner's call. Installed and run here as a dev registration of the pruned 2.3.4 (the signed 2.3.3 removed and put back after): D3D11 + D3D11VA + Vulkan decode, 4K HEVC at 30 fps, exiftool through `exiftool_files/`, `--switch-test 60` with 56 dual entries, no missing-module warnings. Two things learned: the packaged 2.3.3 wrote **no log at all** (the pre-move location was Program Files — the tracker's guess, confirmed), and the packaged 2.3.4 writes `%LOCALAPPDATA%\QCView\logs\` un-virtualized. A clean machine is still owed.
 - [~] **Does Sparkle's Windows story matter?** The macOS build auto-updates
   through the appcast at `https://qcview.app/appcast.xml`. If Windows has no
   update channel, say so in the release rather than leaving users to discover
