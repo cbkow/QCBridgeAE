@@ -283,6 +283,15 @@ blind against the D3D11 code and has not been compiled:
   and track edits reset; that is the `setBSource` contract, not a bug).
 - [ ] **The QML `DropArea` path still works** while the surface is hidden (a
   modal open) — it now calls `dropMediaAt` with `drop.x / width`.
+- [ ] **Dual view with an empty side** (landed with it, same day). The
+  "no A" gate in `setCompositorMode` is gone; `clearBSource` keeps the mode;
+  loading a new A keeps dual even with no B. On D3D11 nothing changed — the
+  compositor already draws with null views — so this is verify only: run
+  `qcview --empty-dual-test A.mp4 B.mp4` (logs each step's mode and sides;
+  the mode must stay 1 until the explicit single step) and look at the
+  window during it: blank half, divider or seam, other side's picture. Then
+  `--switch-test 40 list.txt` and `--simulate-user` as before (the Mac ran
+  111 steps, 36 entries, 12 exits, clean).
 
 ## QCView — Alt+Scroll timeline pan (fixed on the Mac 2026-09-23, unverified on Windows)
 
