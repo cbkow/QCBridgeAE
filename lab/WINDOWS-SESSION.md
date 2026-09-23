@@ -54,6 +54,11 @@ whether it pushed.
 - **Commit your work on `main` in each repo; push only if you were told
   you may.** The Mac side pushes its own commits; ask before pushing yours
   the first time. Never force-push, never rewrite history.
+- **Pull before you edit `TRACKING-windows.md`, every time.** Both sides
+  write to it during the day. A merge that keeps one side's copy silently
+  drops the other's sections (it happened on 2026-09-23; the Mac restored
+  them). If a pull conflicts in that file, keep both sides' sections — the
+  headings are dated and never overlap.
 - **The Adobe SDKs never enter a repo.** `private/sdk/` is gitignored; keep
   them there.
 - **Secrets stay in the credential store.** Signing keys, notarization or

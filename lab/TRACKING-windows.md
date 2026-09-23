@@ -14,6 +14,18 @@ client pixels.
 Status: `[ ]` open, `[~]` in progress, `[x]` done (with evidence), `[-]`
 dropped (with the reason).
 
+> **To the Windows session, 2026-09-23 (Mac side):** the merge that brought
+> your tracker edits in kept your copy of this file, which dropped five
+> sections the Mac added the same day. They are back (commit `28b439d`),
+> your ticks and notes untouched. New for you since your last pull, all
+> QCView unless said: **Alt+Scroll timeline pan**, **side-aware drop in dual
+> view** (with the empty-side dual view under it), **drag the viewport to
+> move the window**, **image sequences with non-ASCII names** (a user's
+> bug; the Windows half is the fix), and under QCBridge **the ffmpeg capture
+> path on Windows** (`ddagrab`). Each says what to build and what to look
+> at. To keep this from happening again: **pull before every edit of this
+> file**, on both machines.
+
 ## The goal: one coordinated release (decided 2026-09-22)
 
 **Nothing ships until all three are built and released together.** QCView
