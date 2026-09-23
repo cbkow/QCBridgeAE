@@ -265,6 +265,112 @@ sides have no clock (`dualSeekable` false) and the transport hides.
   *Windows 2026-09-23:* single-view `srt://` from a Windows Blender replica works: `LiveStreamDecoder: LIVE (d3d11va zero-copy, 3840x2160)`, 10-bit, through the native helper. Dual with a file on the other side: done (the item above); the file side drives the transport, the live side updates through the CPU path.
 - [ ] **Live + live**: transport and timeline hidden, both sides updating.
 
+## QCView — Alt+Scroll timeline pan (fixed on the Mac 2026-09-23, unverified on Windows)
+
+Reported from Windows: Alt+Scroll pans the timeline on macOS and does
+nothing on Windows. Cause, from the Qt 6.11.1 source: the Windows (and X11)
+platform plugin reports Alt+wheel as a *horizontal* rotation
+(`qwindowspointerhandler.cpp`, `keyModifiers & Qt::AltModifier` →
+`QPoint(delta, 0)`); Cocoa keeps it vertical. Both timeline wheel handlers
+read only `angleDelta.y`, so on Windows the pan delta was always zero.
+`TimelinePanel.qml` now folds x into y for the Alt case only
+(`wheelPanDelta`). The macOS build is green and the Mac path is unchanged.
+
+- [ ] **Alt+Scroll pans on Windows** with a mouse wheel, in the track area
+  and over the overview bar, and in the same direction as macOS (the folded
+  delta keeps Windows' sign; `WM_MOUSEHWHEEL` is the one Qt negates, and
+  Alt+vertical is not that message). If the direction is reversed, say so;
+  do not flip it locally.
+- [ ] **Plain Scroll still zooms** and a trackpad horizontal swipe with no
+  modifier does nothing (the fold is gated on Alt).
+
+## QCView — side-aware drop in dual view (landed on the Mac 2026-09-23, Windows half unbuilt)
+
+A file dropped onto the viewport in Side-by-Side or Split-Wipe now loads the
+side it lands on (left → A via the ordinary open path, right → B via
+`setBSource`), and the target side is lifted toward white while the drag
+hovers. Routing is in `WindowManager::dropMediaAt`; the split rule is
+half for side-by-side, `splitPos` for wipe. The Windows half was written
+blind against the D3D11 code and has not been compiled:
+
+- [ ] **It builds.** `D3D11DropTarget` grew hover and leave callbacks and a
+  `POINTL` on drop; `D3D11PlayerRenderer::init` maps the point with
+  `ScreenToClient` + `GetClientRect` on the child HWND and normalizes it.
+  `d3d11_dual_compositor.cpp` gained an `int dropSide` at cbuffer offset 56
+  (it took one of the two pad floats; `sizeof(DualCB)` is still 64 and the
+  static_asserts hold) and the matching `dropSide` in the HLSL cbuffer after
+  `diffGain`.
+- [ ] **A drag over the right half of a side-by-side lights the right half,
+  the left lights the left**, and the highlight clears on leave and on drop.
+  Wipe follows the seam. Difference and single light the whole canvas.
+- [ ] **The drop lands on the side it showed**, on a real dual session, with
+  an mp4 on each side. Dropping on B rebuilds the island (expected: playhead
+  and track edits reset; that is the `setBSource` contract, not a bug).
+- [ ] **The QML `DropArea` path still works** while the surface is hidden (a
+  modal open) — it now calls `dropMediaAt` with `drop.x / width`.
+- [ ] **Dual view with an empty side** (landed with it, same day). The
+  "no A" gate in `setCompositorMode` is gone; `clearBSource` keeps the mode;
+  loading a new A keeps dual even with no B. On D3D11 nothing changed — the
+  compositor already draws with null views — so this is verify only: run
+  `qcview --empty-dual-test A.mp4 B.mp4` (logs each step's mode and sides;
+  the mode must stay 1 until the explicit single step) and look at the
+  window during it: blank half, divider or seam, other side's picture, and
+  the transport plus two timeline lanes present in every dual state
+  (`dualSeekable` used to read two empty sides as two live sides and hid
+  both bands; the first step now dwells 2.5 s so you can see it). Then
+  `--switch-test 40 list.txt` and `--simulate-user` as before (the Mac ran
+  111 steps, 36 entries, 12 exits, clean).
+
+## QCView — drag the viewport to move the window (landed 2026-09-23, Windows half unbuilt)
+
+A left press on the viewport that neither the wipe seam nor a drawing tool
+claims, dragged past the threshold, calls `QWindow::startSystemMove()` on
+the UI window (`WindowManager::startWindowMove`, gated by the
+`ui/dragViewportMovesWindow` setting, off in fullscreen and under a modal).
+On Windows the press arrives in the centerStage MouseArea in `Main.qml`
+(the D3D11 child is HTTRANSPARENT) and the QML calls the invokable.
+
+- [ ] **It moves.** With no drawing tool selected, drag the viewport: the
+  window follows, snaps at edges like a title-bar drag. A plain click does
+  nothing. Qt's Win32 `startSystemMove` sends `SC_MOVE` with the button
+  held — confirm it takes over cleanly from the QML press.
+- [ ] **It yields.** Select a pen: dragging draws, the window stays. Wipe
+  mode: dragging the seam moves the seam, not the window. Borderless
+  fullscreen (F): nothing moves. Settings → "Drag viewport to move
+  window" off: nothing moves.
+- [ ] **After the move** the next click still reaches the annotator (the
+  QML MouseArea disarms on release; if Windows swallows the release inside
+  the move loop, the next press re-arms anyway — check the first stroke
+  after a move is not lost).
+
+## QCView — image sequences with non-ASCII names (fixed blind 2026-09-23; this is the Windows bug)
+
+A Chinese user reported image sequences with Chinese file names not
+loading. Detection was never the problem (the regexes capture the base
+with `.+`); the loaders were. Paths leave Qt as UTF-8 and the PNG, JPEG
+and TIFF loaders opened them with narrow `fopen` / `TIFFOpen`, which on
+Windows reads the ANSI code page — so a CJK name never resolved and the
+sequence cache's frame-0 probe refused the sequence. EXR was already fine
+(`MemoryMappedIStream` → `CreateFileW`). Now `src/decode/utf8_file.h`
+converts UTF-8 → UTF-16 and uses `_wfopen` / `TIFFOpenW` on Windows;
+exiftool gets `-charset filename=utf8` there too. macOS verified with
+JPEG and PNG sequences named `镜头_0000.jpg` / `画面_0000.png` in a
+`测试序列` folder — but macOS never had the bug, so:
+
+- [ ] **It builds.** `utf8_file.h` includes `<windows.h>` with
+  `WIN32_LEAN_AND_MEAN` + `NOMINMAX` (the same NOMINMAX story as
+  `read_ahead.cpp`); `TIFFOpenW` must exist in the vcpkg libtiff (it is
+  Windows-only API, `#ifdef _WIN32`).
+- [ ] **A CJK-named sequence loads**, PNG, JPEG and TIFF each (make one
+  with `ffmpeg -i x.mp4 测试序列/镜头_%04d.png`), from a CJK-named folder,
+  on a machine whose system locale is *not* Chinese (that is the case that
+  fails: on a Chinese-locale box the ANSI page happens to cover it). EXR
+  as the control, which worked before.
+- [ ] **The Inspector shows metadata** for a CJK-named file (the exiftool
+  charset flag) — compare against an ASCII copy of the same file.
+- [ ] **Thumbnails and scrub** on that sequence (same loaders, via the
+  thumbnail cache and the dual scrub path).
+
 ## QCView — packaging changes that touch Windows (2026-09-22)
 
 The macOS release flow was rebuilt (`scripts/`, committed now — it used to be
@@ -308,6 +414,34 @@ its conclusions need a Windows twin before they are safe to build on.
 - [x] ~~No host-side demux leg.~~ Done 2026-09-22 on the Mac: the video lane
   is out of the transport entirely and `video_listen` is deleted. Nothing for
   Windows to inherit.
+
+## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
+
+Native capture (S7) is out of scope for this release *because the ffmpeg
+capture path works* — and that has only ever been shown on the Mac
+(avfoundation → VideoToolbox). The Windows run that exists
+(`spikes/parity/results/2026-09-17-win-loopback/`) fed NVENC a synthetic
+`testsrc`, not the screen. The replica's real Windows argv is in
+`qcbridge/ring0/pixel_path.py`: `ddagrab=output_idx=0:framerate=<fps>:draw_mouse=0`
+→ `hevc_nvenc` (main10, `-tune ull -delay 0 -bf 0`), GPU-resident, the display
+*is* the viewport in kiosk mode. Phase 4's first item silently depends on it.
+
+- [ ] **The bundled ffmpeg has `ddagrab`.** QCView's Windows ffmpeg
+  (`%LOCALAPPDATA%\QCView\bin\ffmpeg.exe`) needs a build with D3D11VA and the
+  `ddagrab` filter (`ffmpeg -filters | findstr ddagrab`). The 09-17 notes
+  confirm libsrt and hevc_nvenc; they do not mention ddagrab.
+- [ ] **A replica Blender in kiosk mode streams its screen.** Start the replica
+  with streaming on, receive in QCView (or `probe_reader.py`), and confirm the
+  picture is the Blender viewport at the configured fps, with no cursor. Note
+  `output_idx=0`: on a multi-monitor box the capture is the *first* output,
+  which may not be the one Blender is on — say which monitor you used.
+- [ ] **The 4:4:4 rung** (`hevc_10_444_50`) takes the CPU path
+  (`hwdownload,format=bgra,format=yuv444p10le`, profile `rext`). Confirm it
+  actually produces 4:4:4 at the receiver — the code comment says NVENC
+  silently downgrades 4:4:4 on GPU frames, so verify receiver-side.
+- [ ] **Glass-to-glass with ddagrab**, the way Phase 4 asks: the synthetic
+  pipe number is 43 ms at 1080p60; the screen-capture number is the one a
+  user gets. Write both.
 
 ## QCBridge — the agent after the quinn port (2026-09-22, then branch `spike/quinn`, now `main`)
 
