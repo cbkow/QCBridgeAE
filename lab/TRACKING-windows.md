@@ -276,7 +276,7 @@ sides have no clock (`dualSeekable` false) and the transport hides.
   what wakes it — if the live side only repaints when you move the mouse,
   that callback is not reaching the renderer.
   *Windows 2026-09-23:* single-view `srt://` from a Windows Blender replica works: `LiveStreamDecoder: LIVE (d3d11va zero-copy, 3840x2160)`, 10-bit, through the native helper. Dual with a file on the other side: done (the item above); the file side drives the transport, the live side updates through the CPU path.
-- [ ] **Live + live**: transport and timeline hidden, both sides updating.
+- [~] **Live + live**: transport and timeline hidden, both sides updating.
 
 ## QCView — Alt+Scroll timeline pan (fixed on the Mac 2026-09-23, unverified on Windows)
 
@@ -390,6 +390,7 @@ The macOS release flow was rebuilt (`scripts/`, committed now — it used to be
 gitignored, which is how the originals were lost with the old Mac). Three of
 those changes are not macOS-only:
 
+  *Windows 2026-09-23:* the AE feed (`qcbae://ae`, connected from the File menu) as A and the Blender native-capture SRT stream as B, entered through `--simulate-user`: dual up, B live through the D3D11 path, no errors; the operator confirmed the picture. AE was idle so its receiver on the dual side logged no new frame in that window — the AE side and the kiosk-cropped capture get their pass in the full two-machine flow (owner's call). The capture showed the whole display because the scratch replica ran without kiosk; the agent-launched replica is a kiosk.
 - [x] **The log moved out of the app bundle.** `installFileLogger` wrote next
   to the executable, which on Windows is `Program Files` — never writable, so
   released builds almost certainly had no log at all. It is now
