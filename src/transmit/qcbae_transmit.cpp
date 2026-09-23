@@ -33,6 +33,15 @@
 // Privacy: a Transmit device receives no project paths or comp names; the
 // only label published is the host's name (PLAN.md §Privacy 5, 6).
 
+// The one exported symbol. PrSDKEntry.h has DllExport for this, but it is
+// reached only through the play-module headers; spell it out here so the
+// entry point below never depends on include order.
+#if defined(_WIN32)
+#  define QCBAE_EXPORT __declspec(dllexport)
+#else
+#  define QCBAE_EXPORT __attribute__((visibility("default")))
+#endif
+
 #include "PrSDKTransmit.h"
 #include "PrSDKPPixSuite.h"
 #include "PrSDKTimeSuite.h"
@@ -44,6 +53,16 @@
 
 #include "common/convert/half_convert.h"
 #include "common/surface/shared_ring.h"
+
+#if defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#endif
 
 #include <cstdarg>
 #include <cstdio>
@@ -59,7 +78,18 @@ using namespace qcbae;
 
 namespace {
 
+// /tmp on macOS; %TEMP% on Windows (a plugin inside AE has no /tmp and
+// Program Files is read-only). Same file name either side.
+#if defined(_WIN32)
+std::string scratch_file(const char* name) {
+    const char* t = std::getenv("TEMP");
+    return std::string(t && *t ? t : ".") + "\\" + name;
+}
+const std::string S_logPath = scratch_file("qcbridgeae-transmit.log");
+const char* const kLogPath = S_logPath.c_str();
+#else
 constexpr const char* kLogPath = "/tmp/qcbridgeae-transmit.log";
+#endif
 
 // Persistent identity in the host's device list. Never change it, or the host
 // treats the device as new and forgets the user's choice. (The A4 probe has
@@ -70,9 +100,23 @@ constexpr const char* kPluginGUID = "1BB013B9-952D-4D6C-B35E-1E0EF3F52CA8";
 // host, so AE and Premiere running together do not overwrite each other).
 struct Host { const char* ring; const char* label; };
 
-Host detect_host() {
+// The host executable's name: getprogname() on macOS, the module path of
+// the process on Windows ("Adobe Premiere Pro.exe" / "AfterFX.exe").
+std::string host_program_name() {
+#if defined(_WIN32)
+    char buf[MAX_PATH] {};
+    const DWORD n = ::GetModuleFileNameA(nullptr, buf, sizeof buf);
+    std::string p(buf, n < sizeof buf ? n : sizeof buf - 1);
+    const size_t slash = p.find_last_of("\\/");
+    return slash == std::string::npos ? p : p.substr(slash + 1);
+#else
     const char* prog = getprogname();
-    const std::string p = prog != nullptr ? prog : "";
+    return prog != nullptr ? prog : "";
+#endif
+}
+
+Host detect_host() {
+    const std::string p = host_program_name();
     if (p.find("Premiere") != std::string::npos) return {kRingNamePremiere, "Premiere Pro"};
     return {kRingNameAfterEffects, "After Effects"};   // AE, or an unknown MediaCore host
 }
@@ -365,7 +409,7 @@ tmResult PushVideo(const tmStdParms* sp, const tmInstance*, const tmPushVideo* p
 
 }  // namespace
 
-extern "C" __attribute__((visibility("default")))
+extern "C" QCBAE_EXPORT
 tmResult xTransmitEntry(csSDK_int32 interfaceVersion, prBool loadModule, piSuitesPtr, tmModule* out) {
     if (loadModule) {
         logf("--- module load, host interface v%d ---", interfaceVersion);
