@@ -683,12 +683,12 @@ decides when the coordinated release can happen.
 
 ### QCView
 
-- [~] **A Windows package that installs on a clean machine.** The macOS half
+- [x] **A Windows package that installs on a clean machine.** The macOS half
   was rebuilt and proven this session (signed, notarized, stapled, 124 MB —
   `scripts/RELEASE.md` in that repo). There is no Windows equivalent of
   `sign-and-notarize.sh`. Decide MSIX or a plain installer, and whether it is
   signed.
-  *Windows 2026-09-23:* `cmake --build build-release --target qcview_msix` works on this box (MakeAppx + SignTool from the 26100 SDK, windeployqt 6.11.1): `installer/msix/dist/QCView-2.3.4-win64.msix`, 173 MB, **unsigned** — the sideload signature needs `QCV_SIGNING_PFX` set, and signing is the owner's call. Installed and run here as a dev registration of the pruned 2.3.4 (the signed 2.3.3 removed and put back after): D3D11 + D3D11VA + Vulkan decode, 4K HEVC at 30 fps, exiftool through `exiftool_files/`, `--switch-test 60` with 56 dual entries, no missing-module warnings. Two things learned: the packaged 2.3.3 wrote **no log at all** (the pre-move location was Program Files — the tracker's guess, confirmed), and the packaged 2.3.4 writes `%LOCALAPPDATA%\QCView\logs\` un-virtualized. A clean machine is still owed.
+  *Windows 2026-09-23:* `cmake --build build-release --target qcview_msix` works on this box (MakeAppx + SignTool from the 26100 SDK, windeployqt 6.11.1): `installer/msix/dist/QCView-2.3.4-win64.msix`, 173 MB, **unsigned** — the sideload signature needs `QCV_SIGNING_PFX` set, and signing is the owner's call. Installed and run here as a dev registration of the pruned 2.3.4 (the signed 2.3.3 removed and put back after): D3D11 + D3D11VA + Vulkan decode, 4K HEVC at 30 fps, exiftool through `exiftool_files/`, `--switch-test 60` with 56 dual entries, no missing-module warnings. Two things learned: the packaged 2.3.3 wrote **no log at all** (the pre-move location was Program Files — the tracker's guess, confirmed), and the packaged 2.3.4 writes `%LOCALAPPDATA%\QCView\logs\` un-virtualized. Then the real flow (QCView memory `windows-release-process`): unsigned Store package stashed, signed pass through `build_msix.ps1` directly with the dev cert, pair verified (140.77/140.76 MiB, 971/973 entries, manifests 2.3.4.0, p7x in the sideload only), **the signed 2.3.4 sideload installed over 2.3.3 on this box and LIVE on the AE ring from the alias**. The dev cert is the sideload signature (subject matches the publisher, valid to 2027-03); a release cert and the Store upload are the owner's. A machine that has never seen the SDK or Qt is still owed.
 - [~] **Does Sparkle's Windows story matter?** The macOS build auto-updates
   through the appcast at `https://qcview.app/appcast.xml`. If Windows has no
   update channel, say so in the release rather than leaving users to discover
