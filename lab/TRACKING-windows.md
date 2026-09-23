@@ -372,8 +372,17 @@ for simulations, local-edit detection on the replica, and path mapping from
 any host OS. Nothing in it is `#[cfg(unix)]`-gated, so the risk is
 behavioural, not build.
 
+- [ ] **The agent now links zstd (`zstd-sys`, C).** `cargo build` needs a C
+  compiler in the MSVC toolchain (the Build Tools' `cl.exe`, which rustc's
+  msvc target already wants for linking) — until now the agent's C was
+  only ring's, which ships prebuilt objects. If the build fails in
+  `zstd-sys`, that is the reason. Cold-lane payloads are compressed on the
+  agent's threads so Blender writes and loads `.blend` partials
+  uncompressed; the contract test
+  `test_cold_payloads_round_trip_byte_identical` is the proof it survives
+  the wire.
 - [ ] **Build and unit suite.** `cargo build --release` in `agent/`, then
-  `python -m pytest -q` → **101 passed**, including
+  `python -m pytest -q` → **102 passed**, including
   `test_fast_lane_is_not_behind_a_cold_blob`,
   `test_agent_advertises_byte_credits` and `test_localize_any_…`. The
   discovery test binds UDP/4246 and fails while any replica agent is
