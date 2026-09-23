@@ -289,7 +289,10 @@ blind against the D3D11 code and has not been compiled:
   compositor already draws with null views — so this is verify only: run
   `qcview --empty-dual-test A.mp4 B.mp4` (logs each step's mode and sides;
   the mode must stay 1 until the explicit single step) and look at the
-  window during it: blank half, divider or seam, other side's picture. Then
+  window during it: blank half, divider or seam, other side's picture, and
+  the transport plus two timeline lanes present in every dual state
+  (`dualSeekable` used to read two empty sides as two live sides and hid
+  both bands; the first step now dwells 2.5 s so you can see it). Then
   `--switch-test 40 list.txt` and `--simulate-user` as before (the Mac ran
   111 steps, 36 entries, 12 exits, clean).
 
