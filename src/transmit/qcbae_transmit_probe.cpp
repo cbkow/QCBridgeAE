@@ -33,6 +33,15 @@
 // Privacy: the host gives a Transmit device no project paths or comp names,
 // and nothing here asks for them (PLAN.md §Privacy 5, 6).
 
+// The one exported symbol. PrSDKEntry.h has DllExport for this, but it is
+// reached only through the play-module headers; spell it out here so the
+// entry point below never depends on include order.
+#if defined(_WIN32)
+#  define QCBAE_EXPORT __declspec(dllexport)
+#else
+#  define QCBAE_EXPORT __attribute__((visibility("default")))
+#endif
+
 #include "PrSDKTransmit.h"
 #include "PrSDKPPixSuite.h"
 #include "PrSDKTimeSuite.h"
@@ -47,6 +56,7 @@
 
 #include <sys/stat.h>
 
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -60,8 +70,19 @@ using namespace qcbae;
 namespace {
 
 constexpr const char* kRingName   = "/qcbae-probe";   // what qcbae-probe opens
+#if defined(_WIN32)
+std::string scratch_file(const char* name) {   // %TEMP%, see qcbae_transmit.cpp
+    const char* t = std::getenv("TEMP");
+    return std::string(t && *t ? t : ".") + "\\" + name;
+}
+const std::string S_configPath = scratch_file("qcbridgeae-transmit.conf");
+const std::string S_logPath    = scratch_file("qcbridgeae-transmit-probe.log");
+const char* const kConfigPath = S_configPath.c_str();
+const char* const kLogPath    = S_logPath.c_str();
+#else
 constexpr const char* kConfigPath = "/tmp/qcbridgeae-transmit.conf";
 constexpr const char* kLogPath    = "/tmp/qcbridgeae-transmit-probe.log";
+#endif
 
 // Persistent identity in the host's device list. Generated once; never change
 // it, or the host treats the device as new and forgets the user's choice.
@@ -291,9 +312,8 @@ struct Instance {
 };
 
 double now_s() {
-    struct timespec ts {};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) * 1e-9;
+    // Monotonic seconds on both platforms; the probe only ever differences these.
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 void flush_run(Instance* I, const char* why) {
@@ -624,7 +644,7 @@ tmResult PushVideo(const tmStdParms* sp, const tmInstance* inst, const tmPushVid
 
 }  // namespace
 
-extern "C" __attribute__((visibility("default")))
+extern "C" QCBAE_EXPORT
 tmResult xTransmitEntry(csSDK_int32 interfaceVersion, prBool loadModule, piSuitesPtr, tmModule* out) {
     if (loadModule) {
         logf("--- module load, host interface v%d ---", interfaceVersion);

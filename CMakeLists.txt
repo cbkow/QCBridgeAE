@@ -142,6 +142,24 @@ if(APPLE AND EXISTS "${_pr_headers}/PrSDKTransmit.h")
     # config file for control conditions. An instrument, kept for re-measuring.
     qcbae_transmit_bundle(qcbae-transmit-probe src/transmit/qcbae_transmit_probe.cpp
                           QCBridgeAE-Transmit-Probe src/transmit/Info-probe.plist.in)
+elseif(WIN32 AND EXISTS "${_pr_headers}/PrSDKTransmit.h")
+    message(STATUS "Premiere SDK found: ${QCBAE_PR_SDK}")
+    # On Windows a Transmit plugin is a DLL named .prm, the way the SDK's
+    # Transmitter sample builds it: PRWIN_ENV for the headers, /MD, the entry
+    # point exported with __declspec(dllexport) (QCBAE_EXPORT in the source).
+    # No PiPL, no manifest; MediaCore loads it by the extension.
+    function(qcbae_transmit_prm target source output)
+        add_library(${target} MODULE ${source})
+        target_link_libraries(${target} PRIVATE qcbae_common)
+        target_include_directories(${target} PRIVATE "${_pr_headers}" "${QCBAE_PR_SDK}/Examples/Utils")
+        target_compile_definitions(${target} PRIVATE PRWIN_ENV)
+        set_target_properties(${target} PROPERTIES
+            OUTPUT_NAME "${output}"
+            PREFIX ""
+            SUFFIX ".prm")
+    endfunction()
+    qcbae_transmit_prm(qcbae-transmit src/transmit/qcbae_transmit.cpp QCBridgeAE-Transmit)
+    qcbae_transmit_prm(qcbae-transmit-probe src/transmit/qcbae_transmit_probe.cpp QCBridgeAE-Transmit-Probe)
 else()
     message(STATUS "Premiere SDK not found at ${QCBAE_PR_SDK} — skipping qcbae-transmit")
 endif()
@@ -181,13 +199,12 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
-    # Cross-process, so it needs fork(); the Windows port arrives with A5.
-    if(NOT WIN32)
-        add_executable(ring_tearing_test tests/ring_tearing_test.cpp)
-        target_link_libraries(ring_tearing_test PRIVATE qcbae_common)
-        add_test(NAME ring_tearing COMMAND ring_tearing_test)
-        set_tests_properties(ring_tearing PROPERTIES TIMEOUT 120)
-    endif()
+    # Cross-process: fork() on POSIX, a re-exec of itself as the consumer on
+    # Windows (A5). Either way two real processes share the mapping.
+    add_executable(ring_tearing_test tests/ring_tearing_test.cpp)
+    target_link_libraries(ring_tearing_test PRIVATE qcbae_common)
+    add_test(NAME ring_tearing COMMAND ring_tearing_test)
+    set_tests_properties(ring_tearing PROPERTIES TIMEOUT 120)
 
     # The Transmit conversion pass, read back the way QCView reads it, and the
     # portable half conversion held bit for bit to the hardware (PLAN.md D4).

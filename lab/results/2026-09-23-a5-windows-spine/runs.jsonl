@@ -1,0 +1,13 @@
+{"run":"convert-4k","os":"windows","tier":"8bpc","target":"RGBA8Unorm","mode":"native memcpy","ms":1.21,"fps":827.3,"gb_per_s":54.9}
+{"run":"convert-4k","os":"windows","tier":"8bpc","target":"RGBA16F","mode":"portable scalar to_half (MSVC, not vectorized)","ms":42.54,"fps":23.5,"gb_per_s":2.3,"note":"not a product path (D1: integer tiers never convert)"}
+{"run":"convert-4k","os":"windows","tier":"16bpc","target":"RGBA16Unorm","mode":"native memcpy","ms":2.47,"fps":404.2,"gb_per_s":53.6}
+{"run":"convert-4k","os":"windows","tier":"16bpc","target":"RGBA16F","mode":"portable scalar to_half (MSVC, not vectorized)","ms":43.58,"fps":22.9,"gb_per_s":3.0,"note":"not a product path"}
+{"run":"convert-4k","os":"windows","tier":"32bpc","target":"RGBA32Float","mode":"native memcpy","ms":5.08,"fps":196.9,"gb_per_s":52.3}
+{"run":"convert-4k","os":"windows","tier":"32bpc","target":"RGBA16F","mode":"portable scalar (clamp)","ms":44.79,"fps":22.3,"gb_per_s":4.4}
+{"run":"convert-4k","os":"windows","tier":"32bpc","target":"RGBA16F","mode":"F16C vcvtps2ph (clamp)","ms":4.75,"fps":210.3,"gb_per_s":41.9,"speedup_vs_portable":9.4}
+{"run":"a6-pass-4k","os":"windows","order":"ARGB","bottom_up":true,"path":"F16C","ms":6.49,"fps":154.2,"gb_per_s":30.7}
+{"run":"a6-pass-4k","os":"windows","order":"BGRA","bottom_up":true,"path":"F16C","ms":6.26,"fps":159.9,"gb_per_s":31.8}
+{"run":"a6-pass-4k","os":"windows","order":"ARGB","bottom_up":true,"path":"portable","ms":73.73,"fps":13.6,"gb_per_s":2.7,"speedup_hw_vs_portable":11.4}
+{"run":"convert-test","os":"windows","reference":"VCVTPS2PH","patterns":1048532,"mismatches":0,"checks":84,"failures":0}
+{"run":"ring-unit-test","os":"windows","checks":43,"failures":0}
+{"run":"ring-tearing-test","os":"windows","published":20000,"seen":12,"skipped":19988,"torn":0,"desc_mismatch":0,"out_of_order":0,"result":"PASS"}

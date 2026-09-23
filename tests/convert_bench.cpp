@@ -25,6 +25,13 @@
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
+#if defined(_M_X64) || defined(__x86_64__)
+#include <immintrin.h>
+#define QCBAE_BENCH_F16C 1
+#endif
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
 
 using namespace qcbae;
 
@@ -111,6 +118,25 @@ int main() {
         }
         keep(dst16.data());
     });
+#if defined(QCBAE_BENCH_F16C)
+    // The x86 twin of the NEON row below, for the same comparison: plain
+    // conversion with a clamp, no flip and no reorder.
+    if (convert_has_hardware_path()) {
+        bench("-> RGBA16F F16C (clamp + vcvtps2ph)", N * 6, [&] {
+            const __m256 ceiling = _mm256_set1_ps(65504.0f);
+            auto* d = dst16.data();
+            for (size_t i = 0; i < N; i += 8) {
+                const __m256 a = _mm256_min_ps(_mm256_loadu_ps(src32.data() + i), ceiling);
+                _mm_storeu_si128(reinterpret_cast<__m128i*>(d + i),
+                                 _mm256_cvtps_ph(a, _MM_FROUND_TO_NEAREST_INT));
+            }
+            _mm256_zeroupper();
+            keep(d);
+        });
+    } else {
+        std::printf("  (no F16C on this CPU: the hardware row is skipped)\n");
+    }
+#endif
 #if defined(__ARM_NEON)
     bench("-> RGBA16F NEON (clamp + fcvtn)", N * 6, [&] {
         const float32x4_t ceiling = vdupq_n_f32(65504.0f);
@@ -129,7 +155,8 @@ int main() {
     // IEEE, nothing clamped (PLAN.md D4) — into a padded destination, in one
     // pass. Compare with the plain conversion above: the flip and reorder
     // should cost next to nothing on top of it.
-    std::printf("\nA6 Transmit pass, 4x32f host frame -> top-down RGBA16F:\n");
+    std::printf("\nA6 Transmit pass, 4x32f host frame -> top-down RGBA16F (fast path: %s):\n",
+                convert_has_hardware_path() ? "hardware" : "portable");
     {
         const size_t dst_stride = aligned_bytes_per_row(W, 8);
         std::vector<uint8_t> dst(dst_stride * H);
