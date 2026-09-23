@@ -259,6 +259,31 @@ those changes are not macOS-only:
   PDF, the virtual keyboard and a second FFmpeg — the Windows package may
   deserve the same treatment.
 
+## QCView — side-aware drop in dual view (landed on the Mac 2026-09-23, Windows half unbuilt)
+
+A file dropped onto the viewport in Side-by-Side or Split-Wipe now loads the
+side it lands on (left → A via the ordinary open path, right → B via
+`setBSource`), and the target side is lifted toward white while the drag
+hovers. Routing is in `WindowManager::dropMediaAt`; the split rule is
+half for side-by-side, `splitPos` for wipe. The Windows half was written
+blind against the D3D11 code and has not been compiled:
+
+- [ ] **It builds.** `D3D11DropTarget` grew hover and leave callbacks and a
+  `POINTL` on drop; `D3D11PlayerRenderer::init` maps the point with
+  `ScreenToClient` + `GetClientRect` on the child HWND and normalizes it.
+  `d3d11_dual_compositor.cpp` gained an `int dropSide` at cbuffer offset 56
+  (it took one of the two pad floats; `sizeof(DualCB)` is still 64 and the
+  static_asserts hold) and the matching `dropSide` in the HLSL cbuffer after
+  `diffGain`.
+- [ ] **A drag over the right half of a side-by-side lights the right half,
+  the left lights the left**, and the highlight clears on leave and on drop.
+  Wipe follows the seam. Difference and single light the whole canvas.
+- [ ] **The drop lands on the side it showed**, on a real dual session, with
+  an mp4 on each side. Dropping on B rebuilds the island (expected: playhead
+  and track edits reset; that is the `setBSource` contract, not a bug).
+- [ ] **The QML `DropArea` path still works** while the surface is hidden (a
+  modal open) — it now calls `dropMediaAt` with `drop.x / width`.
+
 ## QCView — Alt+Scroll timeline pan (fixed on the Mac 2026-09-23, unverified on Windows)
 
 Reported from Windows: Alt+Scroll pans the timeline on macOS and does
