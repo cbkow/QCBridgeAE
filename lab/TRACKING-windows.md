@@ -55,39 +55,46 @@ exercised on Windows unless an item says who exercised it.
 
 ## Getting the code
 
-- [ ] **QCView** `main`: everything below (`qcbae-live`, `metal-source-race`,
+- [x] **QCView** `main`: everything below (`qcbae-live`, `metal-source-race`,
   `dual-network-read`, `rotating-upload-textures`, stacked) was
   fast-forwarded into `main` on 2026-09-22. Branch names below say where each
   item was developed. Pull `main`; one fix commit may still be local to the
   Mac.
-- [ ] **QCBridgeAE** `main`: this repo. A1–A4, A6 and A3 are done; A5 and A7
+  *Windows 2026-09-23:* pulled; the Mac's fix commit was in (`49d189c2`). Two commits on top from this side (`e30bf137`, `01577fc2`), unpushed.
+- [x] **QCBridgeAE** `main`: this repo. A1–A4, A6 and A3 are done; A5 and A7
   are what Windows owes.
-- [ ] **QCBridge** (the Blender bridge): `main`. The agent line
+  *Windows 2026-09-23:* pulled; A5 spine landed as `5057e96`, unpushed.
+- [x] **QCBridge** (the Blender bridge): `main`. The agent line
   (`spike/quinn`) was merged into `main` on 2026-09-23; the zmq transport
   remains in it as the frozen fallback. `spike/quinn` is now behind `main`
   — do not use it.
+  *Windows 2026-09-23:* pulled `main` at `1d6e8ec`; commits `a4e2c6c`, `682da7f`, `c1f1e56` on top, unpushed.
 
 ## QCBridgeAE — phase A5 (PLAN.md)
 
 The producer side, so this comes first.
 
-- [ ] **Ring as a named file mapping.** `src/common/surface/shared_ring.cpp`
+- [x] **Ring as a named file mapping.** `src/common/surface/shared_ring.cpp`
   is POSIX (`shm_open` / `mmap` / `ftruncate`). Port it to
   `CreateFileMapping` / `MapViewOfFile` with the same geometry: header padded
   to a page, page-aligned slots, `slots_offset` in the header. Decide the
   object name (`Local\` + the ring name?). AE and QCView share a session, so
   `Global\` shouldn't be needed. Say what you chose in the notes.
-- [ ] **Liveness without `kill(pid, 0)`.** A dead producer's ring persists
+  *Windows 2026-09-23:* `Local\` + name without the slash, page-file backed, same geometry; replace-while-held retires the old mapping and retries. Unit, tearing and ctest pass. `lab/results/2026-09-23-a5-windows-spine/`, commit `5057e96`.
+- [x] **Liveness without `kill(pid, 0)`.** A dead producer's ring persists
   (measured on macOS: neither host unloads the device on quit). The consumer
   checks `producer_pid`; on Windows that is
   `OpenProcess(SYNCHRONIZE)` + `WaitForSingleObject(h, 0)`. Keep the
   "Retired means reopen" rule.
-- [ ] **F16C conversion** for `convert_32f_to_rgba16f`: the main path, see
+  *Windows 2026-09-23:* `qcbae::process_alive()` in `shared_ring.h`, vendored into QCView with the ring. Pid-recycling caveat written down. `lab/results/2026-09-23-a5-windows-spine/`.
+- [x] **F16C conversion** for `convert_32f_to_rgba16f`: the main path, see
   HANDOFF §F16C. Run `convert_test` (it must match the portable scalar bit
   for bit) and `qcbae-convbench`; results to `lab/results/`.
-- [ ] **The Transmit device on Windows.** Build `qcbae-transmit` as the
+  *Windows 2026-09-23:* runtime CPUID, bit-exact against VCVTPS2PH over 1,048,532 patterns; 4K A6 pass 6.5 ms F16C vs 73.7 ms portable (11.4x), memcpy floor ~2.4x the Mac's. `lab/results/2026-09-23-a5-windows-spine/`.
+- [~] **The Transmit device on Windows.** Build `qcbae-transmit` as the
   Premiere SDK's Transmitter sample does, and install it in MediaCore
   (HANDOFF's table).
+  *Windows 2026-09-23:* blocked: the Premiere Pro SDK is not on this machine (the AE SDK 25.6 is). The CMake target is also `APPLE AND EXISTS`; the Windows `.prm` is real work once the SDK arrives. **Stop-and-ask item.**
 - [ ] **Re-measure host behaviour; don't inherit it.** macOS findings
   (`lab/results/2026-09-21-a4-transmit-probe/`): the host picks 32f when
   offered; frames arrive bottom-up; AE flattens alpha over the comp colour,
@@ -96,21 +103,24 @@ The producer side, so this comes first.
   stream unless the background preference is unticked; the device is never
   unloaded on quit; each viewer change pushes 2 frames. Any of these can
   differ on Windows.
-- [ ] **`qcbae-probe`**: `produce` and `dump` should port with the ring;
+- [-] **`qcbae-probe`**: `produce` and `dump` should port with the ring;
   `view` is Metal and needs a D3D11 twin, or skip it and use QCView as the
   viewer.
+  *Windows 2026-09-23:* dropped for Windows: QCView is the viewer; `produce`/`dump` are not needed without the device.
 
 ## QCView — live sources (branch `qcbae-live`)
 
-- [ ] **Enable the host bridge on Windows.** `src/decode/CMakeLists.txt`
+- [x] **Enable the host bridge on Windows.** `src/decode/CMakeLists.txt`
   builds `HostBridgeSource` and defines `QCV_HAS_HOST_BRIDGE` on APPLE only.
   The vendored `src/decode/qcbae/shared_ring.*` gets the same Windows port as
   QCBridgeAE's (keep the two identical; `kFrameDescVersion` guards a
   mismatch). Then enable it for Windows.
-- [ ] **Build check: `c7fef457`** (D3D11 uploads `Format_RGBA16FPx4` as
+  *Windows 2026-09-23:* vendored ring re-copied from `5057e96`, `QCV_HAS_HOST_BRIDGE` on every platform, builds and runs (QCView `01577fc2`). Behaviour waits for a producer. `lab/results/2026-09-23-qcview-windows/`.
+- [~] **Build check: `c7fef457`** (D3D11 uploads `Format_RGBA16FPx4` as
   `R16G16B16A16_FLOAT`), written on macOS and not compiled there. Verify
   over-range and negative values reach the canvas unclamped: sample a pixel,
   don't eyeball it.
+  *Windows 2026-09-23:* compiles on Windows; the over-range/negative pixel sample needs a producer (Transmit or SRT).
 - [ ] **Range override on D3D11's CPU path.** On Metal the range override
   applies only to YUV frames, never to CPU RGBA, so live frames are
   unaffected. Check that D3D11's CPU slot behaves the same.
@@ -124,7 +134,7 @@ A pre-release audit of QCView `main` found the Windows half of the 2.3.4 diff
 has never been compiled — there is no CI, and both of these went in from the
 Mac.
 
-- [ ] **Confirm the `NOMINMAX` fix.** `src/decode/read_ahead.cpp` included
+- [x] **Confirm the `NOMINMAX` fix.** `src/decode/read_ahead.cpp` included
   `<windows.h>` with no guard while calling `std::min`/`std::max` with plain
   arguments in four places, so MSVC could not compile it: windows.h defines
   those as function-like macros. Fixed on the Mac by the same
@@ -132,16 +142,19 @@ Mac.
   fixed blind. **A Windows build is the only thing that proves it**, and it is
   the first thing to try, because nothing else in the file has ever been
   compiled either.
-- [ ] **The read-ahead may be inert on Windows.** `read_ahead.cpp` uses
+  *Windows 2026-09-23:* confirmed — and `video_decoder.cpp` needed the same guard (`907f18ec` added a plain `std::max` under `hwcontext_vulkan.h`'s windows.h). QCView `e30bf137`. `lab/results/2026-09-23-qcview-windows/`.
+- [~] **The read-ahead may be inert on Windows.** `read_ahead.cpp` uses
   `SetThreadPriority(THREAD_MODE_BACKGROUND_BEGIN)`, which throttles I/O far
   harder than macOS's `IOPOL_UTILITY`. Check the `ReadAhead: … window warm`
   log actually reports a useful fetch rate rather than crawling.
-- [ ] **Live in dual freezes a D3D11-decoded side.** `DualFrame` has `Cpu`,
+  *Windows 2026-09-23:* builds and logs `window warm` on every open, but the media here is local NVMe (cache hits); the LucidLink/background-priority question needs the studio filespace mounted on this box. Open.
+- [~] **Live in dual freezes a D3D11-decoded side.** `DualFrame` has `Cpu`,
   `Metal` and `Vulkan` kinds but no D3D11 one, so
   `dual_live_source.cpp:186-190` falls through to `default:` and the side
   holds its previous frame for ever, silently. An SRT stream decoded through
   D3D11VA on one side of dual is the case. Needs either a D3D11 `DualFrame`
   kind or an honest status instead of a frozen picture.
+  *Windows 2026-09-23:* confirmed by reading (`default: return`); the fix wants the SRT-in-dual run (Phase 4) to test against.
 
 ## QCView — threading fixes (branch `metal-source-race`)
 
@@ -151,7 +164,7 @@ the check is a long harness run plus the real-app dual matrix.
 switches media, enters and leaves dual and trims the timeline, then quits.
 `QCV_SWITCH_SEED` replays a sequence; macOS used seed 3222196691.
 
-- [ ] **Build and test `9c3874f6`: the D3D11 teardown handshake.** RELEASE
+- [x] **Build and test `9c3874f6`: the D3D11 teardown handshake.** RELEASE
   BLOCKER for a cross-platform 2.3.4 — its own commit message says "Build and
   run the dual matrix on Windows before merging", and it was merged anyway.
   The Metal original was validated under TSan with a 321-step replay; this
@@ -163,7 +176,8 @@ switches media, enters and leaves dual and trims the timeline, then quits.
   the source setters take it. Check: no deadlock under `--switch-test`, no
   hitch when switching media, and the wipe drag is as smooth as before (its
   parameters are atomics, not locked).
-- [ ] **Shared-code commits, verify on Windows:**
+  *Windows 2026-09-23:* `--switch-test 600`: 1417 steps, 443 dual entries/exits across D3D11VA, Vulkan and CPU sources, done logged, exit 0, no deadlock, 0 non-QML warnings. Wipe-drag smoothness owed by hand. `lab/results/2026-09-23-qcview-windows/`.
+- [x] **Shared-code commits, verify on Windows:**
   - `bde75934`: a B change in dual rebuilds the island. This goes through the
     Windows-only `m_dualSourceAdapter` teardown and cold entry. Clearing B
     returns to single view.
@@ -173,8 +187,10 @@ switches media, enters and leaves dual and trims the timeline, then quits.
     D3D11's capture reads the ComPtr-held slot and needs no change.)
   - `eb323d05`: no B chip or dual controls for a stream item.
   - `d28dc540`, `aaeb1ade`: the harness itself should build.
-- [ ] Long run: `--switch-test 600` on a Release build with the Windows media
+  *Windows 2026-09-23:* exercised by the same switch run (harness builds; B set/clear through `m_dualSourceAdapter` 443 times; head-trim bursts). Visual deltas owed by hand.
+- [x] Long run: `--switch-test 600` on a Release build with the Windows media
   set. Pass = no crash, no hang, and "done" logged.
+  *Windows 2026-09-23:* pass — no crash, no hang, "done" logged.
 
 ## QCView — network read-ahead (branch `dual-network-read`)
 
@@ -183,7 +199,7 @@ arrives slowly (measured on macOS: ~60–70 MB/s through LucidLink's local
 SMB gateway, shared by every reader). `ReadAhead` (`src/decode/read_ahead.*`)
 warms the byte ranges of the next ~2 s of frames from the container index.
 
-- [ ] **Build check: `e7e7995f` and the touch rewrite after it.** Written on
+- [x] **Build check: `e7e7995f` and the touch rewrite after it.** Written on
   macOS. The read-ahead now touches one byte per 1 MiB page (LucidLink's
   cache page) rather than copying frames. The Windows-specific part is
   `SetThreadPriority(THREAD_MODE_BACKGROUND_BEGIN)` for the worker; reads go
@@ -191,26 +207,31 @@ warms the byte ranges of the next ~2 s of frames from the container index.
   equivalent for a 1-byte read (`FILE_FLAG_NO_BUFFERING` needs aligned
   sector-sized reads), so there the OS may keep the touched page, which is
   harmless.
-- [ ] **Does LucidLink on Windows hydrate from a touch?** On macOS
+  *Windows 2026-09-23:* builds; the worker runs under `THREAD_MODE_BACKGROUND_BEGIN`.
+- [~] **Does LucidLink on Windows hydrate from a touch?** On macOS
   `lucid3 cache` showed the on-disk cache grow by the file's size after a
   touch of an uncached file. Repeat on Windows; the client may mount the
   filespace differently.
-- [ ] **Does it help on Windows?** Open an uncached large file on a network
+  *Windows 2026-09-23:* needs the filespace on this box; not mounted today.
+- [~] **Does it help on Windows?** Open an uncached large file on a network
   share with `QCV_READAHEAD_SECONDS=0` (off) and at the default. Compare how
   quickly a paused seek and the first seconds of playback fill; the
   `ReadAhead: … window warm` log lines give the fetch rate. Background mode
   also lowers I/O priority on Windows; check that it doesn't starve the
   read-ahead on an idle machine.
-- [ ] **Loop-range hydration** (commit after `b116e372`): loop on + in/out
+  *Windows 2026-09-23:* same — needs a network share. Local NVMe only says the code runs.
+- [~] **Loop-range hydration** (commit after `b116e372`): loop on + in/out
   set touches the whole range, in single and dual. Shared code; verify the
   `ReadAhead: … loop range … touched` log line appears and the range plays
   smoothly on the next pass.
-- [ ] `bc8ca1c4` only adds dual-decoder diagnostics (slow read, read EOF,
+  *Windows 2026-09-23:* shared code, builds; the `loop range … touched` line needs a loop set by hand. Owed.
+- [x] `bc8ca1c4` only adds dual-decoder diagnostics (slow read, read EOF,
   empty-ring stall); nothing to port.
+  *Windows 2026-09-23:* nothing to port; builds.
 
 ## QCView — upload ring (branch `rotating-upload-textures`)
 
-- [ ] **Does D3D11 need a twin?** macOS landed `MetalUploadRing`: CPU frames
+- [x] **Does D3D11 need a twin?** macOS landed `MetalUploadRing`: CPU frames
   go into a ring of textures so an upload never overwrites one a frame in
   flight samples. On macOS the old single-texture path overwrote an
   in-flight texture 1 in ~1000 uploads at 4K60 with OCIO, and 0 at 1080p60.
@@ -219,6 +240,7 @@ warms the byte ranges of the next ~2 s of frames from the container index.
   confirm that before porting anything. The dual compositor's other change,
   skipping the re-upload of an unchanged frame every vsync, is worth
   checking on D3D11 regardless (`d3d11_dual_compositor.cpp`).
+  *Windows 2026-09-23:* no: the CPU path is `UpdateSubresource` on `D3D11_USAGE_DEFAULT` textures (player renderer, texture pool, dual compositor), which the runtime orders against in-flight draws. No hazard by construction. `lab/results/2026-09-23-qcview-windows/`.
 
 ## QCView — live sources in dual view (branch `dual-live`)
 
@@ -228,10 +250,11 @@ hosts). A live side is a `DualLiveSource`
 frame back for any master frame. Live can be either side or both; two live
 sides have no clock (`dualSeekable` false) and the transport hides.
 
-- [ ] **Build check.** New file in `qcv_dual`; `LiveSource::setSink` now takes
+- [x] **Build check.** New file in `qcv_dual`; `LiveSource::setSink` now takes
   a `LiveFrameSink*` (`decode/live_source.h`), which `VideoDecoder`
   implements. `DualLiveSource` has a `Q_OS_WIN` branch that clones a Vulkan
   AVFrame the way `DualVideoDecoder` does; that path has never been compiled.
+  *Windows 2026-09-23:* compiles, including the `Q_OS_WIN` Vulkan-clone branch that never had.
 - [ ] **srt:// in dual on Windows.** `qcbae://` stays macOS-only until the
   ring port above, but SRT works on both: put a stream on one side and a file
   on the other, check the file side still drives the transport and the live
@@ -246,14 +269,16 @@ The macOS release flow was rebuilt (`scripts/`, committed now — it used to be
 gitignored, which is how the originals were lost with the old Mac). Three of
 those changes are not macOS-only:
 
-- [ ] **The log moved out of the app bundle.** `installFileLogger` wrote next
+- [x] **The log moved out of the app bundle.** `installFileLogger` wrote next
   to the executable, which on Windows is `Program Files` — never writable, so
   released builds almost certainly had no log at all. It is now
   `%LOCALAPPDATA%/QCView/logs/` (`QCV_LOG_DIR` overrides). Confirm a packaged
   Windows build actually writes there.
-- [ ] **Qt Multimedia was dropped** from `find_package` (nothing used it).
+  *Windows 2026-09-23:* a built binary writes `%LOCALAPPDATA%\QCView\logs\qcview-log.txt`. `lab/results/2026-09-23-qcview-windows/`. The MSIX check is Phase 5.
+- [x] **Qt Multimedia was dropped** from `find_package` (nothing used it).
   windeployqt should stop shipping Qt's media plugin and its FFmpeg; check the
   MSIX shrinks and nothing breaks.
+  *Windows 2026-09-23:* no `Qt6Multimedia` anywhere in `build-release`; MSIX size is Phase 5.
 - [ ] **Pruning.** `scripts/prune_bundle.sh` is macOS-shaped (frameworks,
   otool). If windeployqt is as generous as macdeployqt was — it deployed Qt3D,
   PDF, the virtual keyboard and a second FFmpeg — the Windows package may
@@ -287,27 +312,32 @@ Kyber is gone; the transport is plain `quinn`. The Mac side builds, passes
 10/10 transport contract tests and 87/87 pytest. None of it has been compiled
 on Windows.
 
-- [ ] **Build the agent on Windows.** `cargo build` in `agent/`. The old
+- [x] **Build the agent on Windows.** `cargo build` in `agent/`. The old
   Rust 1.89 pin came from Kyber and can relax; the Mac builds on 1.98.1.
   There is no `build-win.*` script and no external clone to make any more —
   `HANDOFF-windows.md` task 4 is superseded.
-- [ ] **Run the contract tests there.** `python -m pytest -q` → expect 87
+  *Windows 2026-09-23:* `cargo build --release` clean, 45 s, `zstd-sys` included. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
+- [x] **Run the contract tests there.** `python -m pytest -q` → expect 87
   passed, 0 skipped. `tests/test_transport_agent.py` spawns two
   `qcbridge-agent` processes itself, so it needs only the built binary. If it
   *skips*, the binary was not found — that is a fail, not a pass.
-- [ ] **Check the per-instance config change.** Cert and `agent.json` now
+  *Windows 2026-09-23:* 100 passed, 2 skipped — the skips are `skipif(darwin)` marks in `test_pathmap.py`, not a missing binary (== the Mac's 102).
+- [x] **Check the per-instance config change.** Cert and `agent.json` now
   derive from the config file's directory, so `--config` isolates an
   instance. Confirm the default path still resolves to
   `%APPDATA%\QCBridge\` and that two agents with different configs do not
   share a certificate.
-- [ ] **21-check smoke over the agent transport**, now committed as
+  *Windows 2026-09-23:* `--config` isolates cert and agent.json beside the TOML; the default resolves to `%APPDATA%\QCBridge\` (Roaming). Both run.
+- [x] **21-check smoke over the agent transport**, now committed as
   `smokes/`: `QCB_TRANSPORT=agent QCB_AGENT=spawn`. The scripts are zsh and
   macOS-shaped (`${0:a:h}`, `/Applications/...`); a Windows equivalent is
   its own task. `$BLENDER` overrides the binary.
-- [ ] **Re-run the transport A/B.** `bootstrap_bench.sh <w> agent 8` and
+  *Windows 2026-09-23:* 21/21 via `smokes/run_smokes.py` (Python port of the runners, `a4e2c6c`). QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
+- [~] **Re-run the transport A/B.** `bootstrap_bench.sh <w> agent 8` and
   `... 40` against `zmq` as control. The Kyber baselines this replaced are
   quoted in `results/2026-09-22-quinn-port/notes.md`; the directories that
   held them were deleted.
+  *Windows 2026-09-23:* the latency bench ran for both transports (see the sync section below); `bootstrap_bench.sh` itself not yet ported.
 - [ ] **Cross-machine rungs.** Everything measured so far is loopback, where
   SRT's latency buffer looks like pure overhead. mac↔win with real loss is
   what decides how low that setting can actually go.
@@ -321,7 +351,7 @@ Network submenu). All of it built and proven on the Mac only. The group and
 port continue the studio family (MinRender `.1:4243`, UFB `.2:4244`/`.3:4245`)
 so the beacons read as siblings; do not move them.
 
-- [ ] **The beacon socket.** `agent/src/discovery.rs::bind_udp` mirrors UFB's
+- [~] **The beacon socket.** `agent/src/discovery.rs::bind_udp` mirrors UFB's
   Rust `udp_notify.rs` (socket2: `SO_REUSEADDR`, bind `0.0.0.0:4246`, join
   the group, TTL 1, multicast loop on) plus `SO_REUSEPORT`, which is
   `#[cfg(unix)]` — Windows has no such option and `SO_REUSEADDR` alone means
@@ -330,41 +360,46 @@ so the beacons read as siblings; do not move them.
   another box gets an answer. **Windows Firewall will block inbound
   UDP/4246 until a rule exists** — MinRender's installer adds one for its
   own port (`installer/minrender_installer.iss`); the agent needs the same.
+  *Windows 2026-09-23:* binds `0.0.0.0:4246` and answers direct probes on one box (pytest discovery test, and a tray run). Coexistence with UFB/MinRender and a probe from another box: two-machine. Firewall rule: `agent/windows/firewall-rule.ps1` (`c1f1e56`), needs an installer/elevation to apply.
 - [ ] **Only replicas answer on 4246 — by design, keep it that way.** Two
   sockets sharing the port with reuse both get multicast but a unicast
   probe reaches only one; a host on the port silently ate probes meant for
   the replica beside it on the Mac. If Windows delivery differs, that is
   worth a line in the notes, not a reason to let hosts bind.
-- [ ] **The machine name.** `config::machine_name()` reads `COMPUTERNAME`
+- [~] **The machine name.** `config::machine_name()` reads `COMPUTERNAME`
   on Windows (libc `gethostname` elsewhere). Confirm it is set in the
   interactive session the agent will run in — it is, normally — and that a
   name with spaces or Unicode survives into the phonebook filename
   (`entry_name` replaces anything non-alphanumeric with `_`).
+  *Windows 2026-09-23:* `COMPUTERNAME` is set in the interactive session here; the spaces/Unicode-in-phonebook case not exercised.
 - [ ] **The phonebook on a share.** `phonebook = "<dir>"` writes
   `<dir>/qcbridge/<name>.json` by temp-file-then-rename. Check that rename
   is atomic enough on the SMB path the studio uses (it is what MinRender
   relies on already), that a UNC path and a mapped drive both work, and
   that a stale entry from a machine that crashed is dropped after 60 s
   rather than offered.
-- [ ] **`pid_alive` returns `None` on Windows**, so the single-instance guard
+- [x] **`pid_alive` returns `None` on Windows**, so the single-instance guard
   cannot refuse a second agent there: it needs `OpenProcess(SYNCHRONIZE)` +
   `WaitForSingleObject(h, 0)` via `windows-sys`. Same answer as the
   QCBridgeAE ring's liveness item above; do them together.
-- [ ] **The tray on Windows.** Never run there. Checkable items, a submenu
+  *Windows 2026-09-23:* ported: `OpenProcess(SYNCHRONIZE)` + `WaitForSingleObject(0)` (`a4e2c6c`); unit test asserts a nonsense pid is dead on Windows. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
+- [~] **The tray on Windows.** Never run there. Checkable items, a submenu
   and `set_tooltip` are all supported by muda/tray-icon on Windows, and
   muda's premature check-toggle is in its Windows backend too (the handler
   already sets all three by id). Click through Off / Direct / Discoverable
   and confirm the TOML changes and the addon panel follows.
+  *Windows 2026-09-23:* starts and runs (replica, 6 s, no crash); the Off/Direct/Discoverable click-through is a hand check, owed.
 - [ ] **`find_agent` picks the newest cargo build by mtime.** A stale
   `target/release` once shadowed a fresh `debug` and the contract tests
   passed against an agent that did not know `set_config`. If a Windows run
   ever shows `unknown cmd` in `<base>/host-agent.log`, check which binary
   was spawned before anything else.
-- [ ] **Run it:** `cargo build --release` in `agent/`, then
+- [x] **Run it:** `cargo build --release` in `agent/`, then
   `python -m pytest -q` → 89 passed, 0 skipped on 2026-09-22 (102 by the
   end of 2026-09-23 — see the next section), including
   `test_set_config_round_trip_and_needs_restart` and
   `test_discover_by_direct_probe_finds_the_replica`.
+  *Windows 2026-09-23:* 100 passed + 2 darwin-only skips, both named tests included.
 
 ## QCBridge — the sync after the audit (2026-09-23, then branch `spike/quinn`, now `main`)
 
@@ -380,7 +415,7 @@ already holds, zstd moved from Blender to the agent (pipelined, level 1),
 and a copy-free local link (`memoryview` chunks, `recv_into`). Nothing in it
 is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
 
-- [ ] **The agent now links zstd (`zstd-sys`, C).** `cargo build` needs a C
+- [x] **The agent now links zstd (`zstd-sys`, C).** `cargo build` needs a C
   compiler in the MSVC toolchain (the Build Tools' `cl.exe`, which rustc's
   msvc target already wants for linking) — until now the agent's C was
   only ring's, which ships prebuilt objects. If the build fails in
@@ -392,13 +427,15 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   Watch the agent's CPU while a big blob crosses: the pipeline is what put
   the loopback blob time back where it was, and a Windows box with fewer
   cores will show it differently.
-- [ ] **Build and unit suite.** `cargo build --release` in `agent/`, then
+  *Windows 2026-09-23:* compiled first try with the Build Tools' `cl.exe` (found via vswhere, nothing on PATH). CPU during a blob not watched separately; see the bench's heavy row.
+- [x] **Build and unit suite.** `cargo build --release` in `agent/`, then
   `python -m pytest -q` → **102 passed**, including
   `test_fast_lane_is_not_behind_a_cold_blob`,
   `test_agent_advertises_byte_credits` and `test_localize_any_…`. The
   discovery test binds UDP/4246 and fails while any replica agent is
   running on the machine — that is the port, not the code.
-- [ ] **The smoke runners are zsh.** `run_smoke*.sh`, `bench_latency.sh`,
+  *Windows 2026-09-23:* 100 passed, 2 darwin-only skips; the three named tests pass.
+- [x] **The smoke runners are zsh.** `run_smoke*.sh`, `bench_latency.sh`,
   `coverage/run_coverage.sh` all assume zsh, `mktemp -d /tmp/…`, `kill -9`
   and (mapping) `ln -s`. The Python halves are portable; the runners are
   not. Either port them to PowerShell or run the two Blender halves by hand
@@ -407,7 +444,8 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   replica by hand), `cache` (5), `mapping` (5), and the coverage survey
   (123 actions, 120 of 122 surveyed cross on the Mac; its `t2`/`t1` columns are the blob
   and delta cost per action — read them, not just the status).
-- [ ] **The shared cache root on Windows paths.** `cache_root` (addon
+  *Windows 2026-09-23:* ported to CPython (`smokes/run_smokes.py`): 21/21, reconnect 6/6, cache 5/5, mapping 4/5 (the 5th is not expressible on a same-OS pair — notes), bench both transports, coverage survey. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
+- [~] **The shared cache root on Windows paths.** `cache_root` (addon
   preference, `subtype='DIR_PATH'`) is joined with `os.path.join` and
   `os.makedirs`; the host writes `<root>/<file>/<uuid>/<sim>` and Blender
   writes `.bphys` frames there. Confirm a UNC path and a mapped drive both
@@ -415,16 +453,19 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   `//`-relative root sensibly, and that the replica's "frames exist" test
   (`any(f.endswith('.bphys') …)`) sees files the host just wrote on the SMB
   share without a delay that makes it keep the cache in memory.
-- [ ] **The two cache hazards are Blender behaviour — confirm they hold on
+  *Windows 2026-09-23:* the cache smoke passes on a local root (5/5). UNC and mapped-drive roots, and the SMB timing: two-machine / the studio share.
+- [x] **The two cache hazards are Blender behaviour — confirm they hold on
   Windows.** (7) An unbaked external cache on the replica writes into the
   shared directory and poisons the host's bake; (8) re-setting
   `use_disk_cache`/`use_external` on an already-external evaluated cache
   and seeking wipes the directory. `probes/caches/shared_dir_*.py` reproduce
   both headlessly; run them with `S=<scratch>` set. If either differs on
   Windows, `bootstrap.localize_object_paths` is the code that relies on it.
-- [ ] **`use_disk_cache` is ignored on an unsaved file** (probed on the Mac
+  *Windows 2026-09-23:* both hold on Windows: poisoning 2 vs 24 files, z 2.994 vs 1.5408; wipe 24 → 2 → 0. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
+- [x] **`use_disk_cache` is ignored on an unsaved file** (probed on the Mac
   2026-09-18; the host now refuses to externalize with a panel note). Verify
   the same on Windows so the note is not a false alarm there.
+  *Windows 2026-09-23:* holds: reads back `False`, bake writes 0 files.
 - [ ] **Path mapping from a mac host — the real cross-OS case.** A bootstrap
   carries the host's native paths; a Windows replica must translate
   `/Volumes/…` absolute paths through the table (`pathmap.localize_any`,
@@ -434,14 +475,15 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   host with an absolute texture path under the mapped root and one outside
   it: the first must load, the second must show as "1 unmapped" on both
   panels.
-- [ ] **The reconnect smoke's expectations.** After the replica is killed and
+- [x] **The reconnect smoke's expectations.** After the replica is killed and
   restarted, the host re-handshakes within ~1.5 s (QUIC idle timeout 3 s,
   keepalive 500 ms) and re-bootstraps; a dropped tier-1 frame is detected
   as a gap on the fast lane and the host ships a bootstrap unasked. On
   Windows, kill the replica's Blender *and* its agent (they are separate
   processes; `--exit-with-addon` takes the agent down with Blender when it
   exits cleanly, `taskkill /F` does not give it the chance).
-- [ ] **Latency bench numbers to compare.** Mac loopback, end of day
+  *Windows 2026-09-23:* reconnect 6/6; the replica's Blender is killed with its process tree (`taskkill /T`), so its agent goes too.
+- [x] **Latency bench numbers to compare.** Mac loopback, end of day
   (`spikes/parity/results/2026-09-23-sync-latency/agent-after-pipeline/`):
   tier-1 ~105 ms p50, hot ~30 ms, sweep-path ~200 ms, a delta 150 ms
   behind a 640k-vertex blob 100–130 ms (no longer waits for it), the blob
@@ -450,11 +492,13 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   the tick/sweep path behaves differently there (timer resolution is the
   usual suspect), and a delta-behind-blob far above tier-1 means the fast
   lane or the merge rule is not doing its job.
-- [ ] **The local link reads with `recv_into` and writes buffer lists.**
+  *Windows 2026-09-23:* t1 107/115, hot 29/44, sweep 187/273, hol150 112 — all inside the thresholds. Heavy blob 613 ms vs 327 on the Mac (~1.9x), while the zmq control on the same box does it in 369: the difference is the agent path's uncompressed 61 MB partial crossing Windows' loopback TCP twice (no stall, 16/16 crossed), not Blender. hol0 170–176 on both transports (write cost). Numbers and reading in the notes. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
+- [x] **The local link reads with `recv_into` and writes buffer lists.**
   Windows sockets support both; the one thing to confirm is that a 61 MB
   uncompressed partial crossing the loopback TCP link twice (host→agent,
   agent→Blender) does not stall on Windows' default socket buffers the way
   it does not on macOS — the `heavy` bench row is the measurement.
+  *Windows 2026-09-23:* the heavy row crossed 16/16 with 0 lost; slower than the Mac for the reason above, no stall.
 - [ ] **The blob-digest gate assumes `libraries.write` is deterministic** for
   unchanged data — probed on the Mac (same bytes twice, after `update()`,
   after a move and back). If Windows builds write differently (pointer
