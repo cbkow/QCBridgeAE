@@ -256,12 +256,13 @@ sides have no clock (`dualSeekable` false) and the transport hides.
   implements. `DualLiveSource` has a `Q_OS_WIN` branch that clones a Vulkan
   AVFrame the way `DualVideoDecoder` does; that path has never been compiled.
   *Windows 2026-09-23:* compiles, including the `Q_OS_WIN` Vulkan-clone branch that never had.
-- [ ] **srt:// in dual on Windows.** `qcbae://` stays macOS-only until the
+- [~] **srt:// in dual on Windows.** `qcbae://` stays macOS-only until the
   ring port above, but SRT works on both: put a stream on one side and a file
   on the other, check the file side still drives the transport and the live
   side updates. D3D11 renders on demand, so the frame-available callback is
   what wakes it — if the live side only repaints when you move the mouse,
   that callback is not reaching the renderer.
+  *Windows 2026-09-23:* single-view `srt://` from a Windows Blender replica works: `LiveStreamDecoder: LIVE (d3d11va zero-copy, 3840x2160)`, 10-bit, through the native helper. Dual with a file on the other side not yet run.
 - [ ] **Live + live**: transport and timeline hidden, both sides updating.
 
 ## QCView — packaging changes that touch Windows (2026-09-22)
@@ -590,12 +591,17 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   v4. If Windows measures something very different, that is worth saying.
 - **A/B follow mode** (QCView) — a B reference that follows the host
   playhead. Its own project, after the release.
-- **QCBridge native capture, S7** — DDA/WGC → NVENC inside the agent, the
-  Windows twin of the Swift `qcb-capture-mac`. The agent already prefers a
-  `qcb-capture-win.exe` sitting beside it (`native_capture_argv` in
-  `agent/src/main.rs`), so the hook exists and the binary does not. This is
-  the largest single piece of Windows work still ahead, and it is **not** a
-  release blocker: the ffmpeg capture path still works.
+- ~~**QCBridge native capture, S7**~~ — **done on 2026-09-23 after all, at
+  the owner's call at the box** (this contradicts `PLAN-windows.md` §What
+  is deliberately not here; the decision, not the plan, is recorded here).
+  `agent/capture-win` (`0e942e9`): Desktop Duplication → D3D11 video
+  processor → Media Foundation hardware HEVC, one system API like the Mac's
+  SCK + VideoToolbox, not NVENC direct; same stdout/stdin contract as
+  `qcb-capture-mac`. 4K60 at 3.5 ms/frame (3.0 Main10), 58 of 60 fps. Wired
+  into the pixel path as *helper → ffmpeg mux → SRT* (`2927a38`), which the
+  Mac inherits — flagged. Replica stream into QCView on Windows: d3d11va
+  zero-copy, capture+mux ~0.05 cores. QCBridge
+  `spikes/parity/results/2026-09-23-windows-agent/` §S7.
 
 ## Done
 

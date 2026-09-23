@@ -132,6 +132,24 @@ Multimedia dropped: the build no longer links it (nothing in
 `build-release` references `Qt6Multimedia`). Pruning and the MSIX size:
 Phase 5.
 
+## Addendum, afternoon — `srt://` live on Windows
+
+A Windows Blender replica streaming HEVC over SRT into QCView on the same
+box (QCBridge's Phase 4 first leg): `LiveStreamDecoder: connected — hevc
+3840x2160 pix_fmt=yuv420p10le`, then `LIVE — first frame published
+(d3d11va zero-copy, 3840x2160)`. The live path takes D3D11VA for both
+8-bit and 10-bit HEVC when the stream is well-formed — proven with the
+10-bit and an 8-bit NVENC file streamed over SRT with ffmpeg.
+
+One stream was *not* well-formed and QCView fell to software decode at 4K
+("Invalid pixfmt for hwaccel"): the addon's ffmpeg path on Windows asked
+NVENC for the Main 10 profile while feeding 8-bit BGRA, so the SPS said
+Main 10 over 8-bit samples. That is the producer's fault, fixed in QCBridge
+(`176c76d`) and then superseded by the native helper, which encodes real
+P010. QCView's behaviour — refuse the surface format and fall back rather
+than crash — is the right one; noted so the fallback line in a log is
+read as "look at the stream", not at the decoder.
+
 ## Owed by hand (visual)
 
 Wipe-drag smoothness while switching; slip/trim/slide deltas in dual; no B
