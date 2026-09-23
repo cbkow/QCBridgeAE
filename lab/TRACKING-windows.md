@@ -4,6 +4,7 @@ The running list of Windows work across all three repos: QCView, QCBridgeAE
 and QCBridge. The macOS side adds an item whenever it lands something that
 Windows has to build, port or verify. The Windows side ticks it off with a
 pointer to its evidence (a `lab/results/` folder, a commit).
+`PLAN-windows.md` is the sequence across the three repos — read it first;
 `HANDOFF-windows.md` is the standing instructions; this file is the checklist.
 
 Same rule as the rest of `lab/`: public. No job names, no user paths, no
@@ -27,6 +28,9 @@ merged with "test on Windows before merging" unfulfilled, and one of them
 exercised on Windows unless an item says who exercised it.
 
 ### Suggested order
+
+*(The full sequence, with entry and exit conditions per phase, is
+`PLAN-windows.md`. This is the one-line version.)*
 
 1. **QCView first, because it is the blocker with a known compile error.**
    Get it building, then `9c3874f6`'s dual matrix. Everything else in QCView
