@@ -104,7 +104,7 @@ cache root, path mapping, linked libraries, the local-edit detector).
 2. The smoke runners are zsh (`smokes/README.md`). Port them or run the two
    Blender halves by hand with the same arguments — but run all of them:
    the 21-check, `reconnect` (6), `cache` (5), `mapping` (5), the latency
-   bench, and the coverage survey (123 actions; 119 cross on the Mac).
+   bench, and the coverage survey (123 actions; 120 of the 122 surveyed cross on the Mac).
    Numbers go in `spikes/parity/results/` in the QCBridge repo, next to the
    Mac's, and the bench thresholds in the tracker say what "different"
    means.

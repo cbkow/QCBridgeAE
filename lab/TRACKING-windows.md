@@ -404,7 +404,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   with the same arguments — but run them: the 21-check, `reconnect` (6
   checks: kill and restart the replica mid-session, drop a frame, edit the
   replica by hand), `cache` (5), `mapping` (5), and the coverage survey
-  (123 actions, 118 cross on the Mac; its `t2`/`t1` columns are the blob
+  (123 actions, 120 of 122 surveyed cross on the Mac; its `t2`/`t1` columns are the blob
   and delta cost per action — read them, not just the status).
 - [ ] **The shared cache root on Windows paths.** `cache_root` (addon
   preference, `subtype='DIR_PATH'`) is joined with `os.path.join` and
