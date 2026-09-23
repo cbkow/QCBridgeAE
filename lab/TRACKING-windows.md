@@ -149,13 +149,13 @@ Mac.
   harder than macOS's `IOPOL_UTILITY`. Check the `ReadAhead: … window warm`
   log actually reports a useful fetch rate rather than crawling.
   *Windows 2026-09-23:* builds and logs `window warm` on every open, but the media here is local NVMe (cache hits); the LucidLink/background-priority question needs the studio filespace mounted on this box. Open.
-- [~] **Live in dual freezes a D3D11-decoded side.** `DualFrame` has `Cpu`,
+- [x] **Live in dual freezes a D3D11-decoded side.** `DualFrame` has `Cpu`,
   `Metal` and `Vulkan` kinds but no D3D11 one, so
   `dual_live_source.cpp:186-190` falls through to `default:` and the side
   holds its previous frame for ever, silently. An SRT stream decoded through
   D3D11VA on one side of dual is the case. Needs either a D3D11 `DualFrame`
   kind or an honest status instead of a frozen picture.
-  *Windows 2026-09-23:* confirmed by reading (`default: return`); the fix wants the SRT-in-dual run (Phase 4) to test against.
+  *Windows 2026-09-23:* fixed: `DualLiveSource` now brings a D3D11VA live frame to the CPU and converts it the way `DualVideoDecoder` does a D3D11VA file side (RGBA8/RGBA64 by the depth rule), so the compositor sees a Cpu frame — one readback per frame, the zero-copy D3D11 kind is the next step. Proven with a QCBridge SRT stream on side A and a file on B: `DualLiveSource: D3D11VA live frames brought to the CPU for dual (3840x2160, RGBA64)`, no errors. `--simulate-user` now accepts a live URL for A.
 
 ## QCView — threading fixes (branch `metal-source-race`)
 
@@ -256,13 +256,13 @@ sides have no clock (`dualSeekable` false) and the transport hides.
   implements. `DualLiveSource` has a `Q_OS_WIN` branch that clones a Vulkan
   AVFrame the way `DualVideoDecoder` does; that path has never been compiled.
   *Windows 2026-09-23:* compiles, including the `Q_OS_WIN` Vulkan-clone branch that never had.
-- [~] **srt:// in dual on Windows.** `qcbae://` stays macOS-only until the
+- [x] **srt:// in dual on Windows.** `qcbae://` stays macOS-only until the
   ring port above, but SRT works on both: put a stream on one side and a file
   on the other, check the file side still drives the transport and the live
   side updates. D3D11 renders on demand, so the frame-available callback is
   what wakes it — if the live side only repaints when you move the mouse,
   that callback is not reaching the renderer.
-  *Windows 2026-09-23:* single-view `srt://` from a Windows Blender replica works: `LiveStreamDecoder: LIVE (d3d11va zero-copy, 3840x2160)`, 10-bit, through the native helper. Dual with a file on the other side not yet run.
+  *Windows 2026-09-23:* single-view `srt://` from a Windows Blender replica works: `LiveStreamDecoder: LIVE (d3d11va zero-copy, 3840x2160)`, 10-bit, through the native helper. Dual with a file on the other side: done (the item above); the file side drives the transport, the live side updates through the CPU path.
 - [ ] **Live + live**: transport and timeline hidden, both sides updating.
 
 ## QCView — packaging changes that touch Windows (2026-09-22)

@@ -150,6 +150,26 @@ P010. QCView's behaviour — refuse the surface format and fall back rather
 than crash — is the right one; noted so the fallback line in a log is
 read as "look at the stream", not at the decoder.
 
+## Addendum, later — the frozen D3D11 side in dual, fixed
+
+`dual_live_source.cpp` fell to `default: return` for a D3D11VA-decoded
+live frame, so an SRT stream decoded through D3D11VA on one side of dual
+held its last picture. It now handles `FrameHandle::Kind::D3D11` the way
+`DualVideoDecoder` handles a D3D11VA *file* side: `av_hwframe_transfer_data`
+to NV12/P010, swscale to RGBA8 or RGBA64 by the same depth rule
+(`rgb_range.h`), published as `DualFrame::Kind::Cpu`. One readback per
+frame; a D3D11 `DualFrame` kind would be the zero-copy version and is the
+next step, but a moving picture beats a frozen one and the file side pays
+the same readback today.
+
+Proven with QCBridge's native-capture stream on side A and the 1080p60
+file on B, through `--simulate-user` (which now takes a live URL for A and
+waits for LIVE before dropping B): `LIVE — first frame published (d3d11va
+zero-copy, 3840x2160)` → `dual entry` → `DualLiveSource: D3D11VA live
+frames brought to the CPU for dual (3840x2160, RGBA64)`, no warnings.
+Live + live (AE through Transmit beside the SRT stream) is Phase 4.2 and
+still needs a person to open AE.
+
 ## Owed by hand (visual)
 
 Wipe-drag smoothness while switching; slip/trim/slide deltas in dual; no B
