@@ -356,7 +356,8 @@ so the beacons read as siblings; do not move them.
   ever shows `unknown cmd` in `<base>/host-agent.log`, check which binary
   was spawned before anything else.
 - [ ] **Run it:** `cargo build --release` in `agent/`, then
-  `python -m pytest -q` → 89 passed, 0 skipped, including
+  `python -m pytest -q` → 89 passed, 0 skipped on 2026-09-22 (102 by the
+  end of 2026-09-23 — see the next section), including
   `test_set_config_round_trip_and_needs_restart` and
   `test_discover_by_direct_probe_finds_the_replica`.
 
@@ -364,23 +365,28 @@ so the beacons read as siblings; do not move them.
 
 One day of audit-driven work on the host↔replica sync, all of it proven on
 the Mac only: `SYNC-AUDIT.md`, `COVERAGE.md` and `CACHES.md` in the QCBridge
-repo are the record, `smokes/` the proof. Nine commits, `e816205..af56973`.
-The shape of what changed, for the Windows side to know what to exercise:
-a fast QUIC lane for tier-1 deltas with a merge rule, byte-based credits,
-reconnect/resync recovery, ~50 detection holes closed, a shared cache root
-for simulations, local-edit detection on the replica, and path mapping from
-any host OS. Nothing in it is `#[cfg(unix)]`-gated, so the risk is
-behavioural, not build.
+repo are the record, `smokes/` the proof. Sixteen commits,
+`e816205..e25040f`. The shape of what changed, for the Windows side to know
+what to exercise: a fast QUIC lane for tier-1 deltas with a merge rule,
+byte-based credits, reconnect/resync recovery, ~50 detection holes closed, a
+shared cache root for simulations, local-edit detection on the replica, path
+mapping from any host OS, a blob-digest gate that skips resends the replica
+already holds, zstd moved from Blender to the agent (pipelined, level 1),
+and a copy-free local link (`memoryview` chunks, `recv_into`). Nothing in it
+is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
 
 - [ ] **The agent now links zstd (`zstd-sys`, C).** `cargo build` needs a C
   compiler in the MSVC toolchain (the Build Tools' `cl.exe`, which rustc's
   msvc target already wants for linking) — until now the agent's C was
   only ring's, which ships prebuilt objects. If the build fails in
   `zstd-sys`, that is the reason. Cold-lane payloads are compressed on the
-  agent's threads so Blender writes and loads `.blend` partials
-  uncompressed; the contract test
-  `test_cold_payloads_round_trip_byte_identical` is the proof it survives
-  the wire.
+  agent's blocking threads (four chunks in flight, sent in order, level 1)
+  so Blender writes and loads `.blend` partials uncompressed; the contract
+  test `test_cold_payloads_round_trip_byte_identical` is the proof it
+  survives the wire, and the zmq transport keeps Blender-side compression.
+  Watch the agent's CPU while a big blob crosses: the pipeline is what put
+  the loopback blob time back where it was, and a Windows box with fewer
+  cores will show it differently.
 - [ ] **Build and unit suite.** `cargo build --release` in `agent/`, then
   `python -m pytest -q` → **102 passed**, including
   `test_fast_lane_is_not_behind_a_cold_blob`,
@@ -394,7 +400,8 @@ behavioural, not build.
   with the same arguments — but run them: the 21-check, `reconnect` (6
   checks: kill and restart the replica mid-session, drop a frame, edit the
   replica by hand), `cache` (5), `mapping` (5), and the coverage survey
-  (123 actions, 118 cross on the Mac).
+  (123 actions, 118 cross on the Mac; its `t2`/`t1` columns are the blob
+  and delta cost per action — read them, not just the status).
 - [ ] **The shared cache root on Windows paths.** `cache_root` (addon
   preference, `subtype='DIR_PATH'`) is joined with `os.path.join` and
   `os.makedirs`; the host writes `<root>/<file>/<uuid>/<sim>` and Blender
@@ -429,12 +436,20 @@ behavioural, not build.
   Windows, kill the replica's Blender *and* its agent (they are separate
   processes; `--exit-with-addon` takes the agent down with Blender when it
   exits cleanly, `taskkill /F` does not give it the chance).
-- [ ] **Latency bench numbers to compare.** Mac loopback after the tuning:
-  tier-1 103–114 ms p50, hot ~30 ms, sweep-path ~180 ms, a delta behind a
-  640k-vertex blob ~150–165 ms, the blob itself ~300 ms. The Windows
-  numbers go in `spikes/parity/results/` next to the Mac ones; a tier-1
-  above ~150 ms or a sweep above ~300 ms means something in the tick/sweep
-  path behaves differently there (timer resolution is the usual suspect).
+- [ ] **Latency bench numbers to compare.** Mac loopback, end of day
+  (`spikes/parity/results/2026-09-23-sync-latency/agent-after-pipeline/`):
+  tier-1 ~105 ms p50, hot ~30 ms, sweep-path ~200 ms, a delta 150 ms
+  behind a 640k-vertex blob 100–130 ms (no longer waits for it), the blob
+  itself ~330 ms toggle→visible. The Windows numbers go next to the Mac
+  ones; a tier-1 above ~150 ms or a sweep above ~300 ms means something in
+  the tick/sweep path behaves differently there (timer resolution is the
+  usual suspect), and a delta-behind-blob far above tier-1 means the fast
+  lane or the merge rule is not doing its job.
+- [ ] **The local link reads with `recv_into` and writes buffer lists.**
+  Windows sockets support both; the one thing to confirm is that a 61 MB
+  uncompressed partial crossing the loopback TCP link twice (host→agent,
+  agent→Blender) does not stall on Windows' default socket buffers the way
+  it does not on macOS — the `heavy` bench row is the measurement.
 - [ ] **The blob-digest gate assumes `libraries.write` is deterministic** for
   unchanged data — probed on the Mac (same bytes twice, after `update()`,
   after a move and back). If Windows builds write differently (pointer
