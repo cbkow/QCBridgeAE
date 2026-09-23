@@ -296,6 +296,28 @@ blind against the D3D11 code and has not been compiled:
   `--switch-test 40 list.txt` and `--simulate-user` as before (the Mac ran
   111 steps, 36 entries, 12 exits, clean).
 
+## QCView — drag the viewport to move the window (landed 2026-09-23, Windows half unbuilt)
+
+A left press on the viewport that neither the wipe seam nor a drawing tool
+claims, dragged past the threshold, calls `QWindow::startSystemMove()` on
+the UI window (`WindowManager::startWindowMove`, gated by the
+`ui/dragViewportMovesWindow` setting, off in fullscreen and under a modal).
+On Windows the press arrives in the centerStage MouseArea in `Main.qml`
+(the D3D11 child is HTTRANSPARENT) and the QML calls the invokable.
+
+- [ ] **It moves.** With no drawing tool selected, drag the viewport: the
+  window follows, snaps at edges like a title-bar drag. A plain click does
+  nothing. Qt's Win32 `startSystemMove` sends `SC_MOVE` with the button
+  held — confirm it takes over cleanly from the QML press.
+- [ ] **It yields.** Select a pen: dragging draws, the window stays. Wipe
+  mode: dragging the seam moves the seam, not the window. Borderless
+  fullscreen (F): nothing moves. Settings → "Drag viewport to move
+  window" off: nothing moves.
+- [ ] **After the move** the next click still reaches the annotator (the
+  QML MouseArea disarms on release; if Windows swallows the release inside
+  the move loop, the next press re-arms anyway — check the first stroke
+  after a move is not lost).
+
 ## QCView — Alt+Scroll timeline pan (fixed on the Mac 2026-09-23, unverified on Windows)
 
 Reported from Windows: Alt+Scroll pans the timeline on macOS and does
