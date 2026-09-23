@@ -426,6 +426,13 @@ behavioural, not build.
   numbers go in `spikes/parity/results/` next to the Mac ones; a tier-1
   above ~150 ms or a sweep above ~300 ms means something in the tick/sweep
   path behaves differently there (timer resolution is the usual suspect).
+- [ ] **The blob-digest gate assumes `libraries.write` is deterministic** for
+  unchanged data — probed on the Mac (same bytes twice, after `update()`,
+  after a move and back). If Windows builds write differently (pointer
+  fields, padding), the gate never skips and the only symptom is cost: an
+  undo costs ~34 blobs instead of ~6 in the survey's cost column. Run
+  `QCB_COV_UNDO=1 QCB_COV_ONLY=obj_color,mesh_vertex_move,undo_after_move`
+  and read the `t2` column for the undo row.
 - [ ] **The replica's local-edit detector** is a `depsgraph_update_post`
   handler with time-based attribution (1.5 s touch grace, 3 s after a blob,
   0.5 s after a frame change). It has no platform code, but its false
