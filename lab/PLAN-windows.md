@@ -1,9 +1,9 @@
 # The Windows plan — three repos, one release
 
-*Written 2026-09-23 on the macOS side. This is the sequence; the detail per
-item is in `TRACKING-windows.md` (the checklist, ticked with evidence) and
-the standing instructions are `HANDOFF-windows.md`. Read those two after
-this one, not instead of it.*
+*Written 2026-09-23 on the macOS side. A Windows session starts with
+`WINDOWS-SESSION.md`; this is the sequence; the detail per item is in
+`TRACKING-windows.md` (the checklist, ticked with evidence) and the standing
+instructions are `HANDOFF-windows.md`.*
 
 Three repositories ship together: **QCView** (the viewer), **QCBridgeAE**
 (After Effects / Premiere → QCView) and **QCBridge** (Blender host → Blender
@@ -39,8 +39,8 @@ Entry: a Windows box with an NVIDIA GPU.
   `pyzmq` (QCBridge's suite); Blender 5.2 LTS (QCBridge's smokes).
 - The Adobe SDKs into `private/sdk/` (HANDOFF §Before anything builds). They
   are never in a repo.
-- Clones: QCView `main`; QCBridgeAE `main`; QCBridge **`spike/quinn`** — its
-  `main` is the frozen zmq addon and has no `agent/`.
+- Clones: QCView `main`; QCBridgeAE `main`; QCBridge `main` (the agent line
+  was merged into it on 2026-09-23; `spike/quinn` is behind it now).
 
 Exit: all three configure. Nothing built yet is evidence of anything.
 
@@ -154,9 +154,9 @@ yet, and some of it does not exist on macOS either
   if zmq still ships.
 
 One thing here is **a decision, not a task**, and it is the macOS owner's:
-which branch of QCBridge ships — merge the agent line to `main` and cut
-0.2.0, or keep `main` as the zmq release. Nothing in QCBridge's packaging
-can finish until that is settled. Ask; do not guess.
+the version QCBridge ships as. The agent line is on `main` now; the
+manifest still says 0.1.6, and the bump is a release act. Ask; do not
+guess.
 
 Exit: three installers that install on a machine that has never seen a
 compiler or an SDK.

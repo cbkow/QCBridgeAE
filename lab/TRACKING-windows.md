@@ -4,8 +4,9 @@ The running list of Windows work across all three repos: QCView, QCBridgeAE
 and QCBridge. The macOS side adds an item whenever it lands something that
 Windows has to build, port or verify. The Windows side ticks it off with a
 pointer to its evidence (a `lab/results/` folder, a commit).
-`PLAN-windows.md` is the sequence across the three repos — read it first;
-`HANDOFF-windows.md` is the standing instructions; this file is the checklist.
+`WINDOWS-SESSION.md` is where a Windows session starts; `PLAN-windows.md`
+is the sequence across the three repos; `HANDOFF-windows.md` is the standing
+instructions; this file is the checklist.
 
 Same rule as the rest of `lab/`: public. No job names, no user paths, no
 client pixels.
@@ -61,10 +62,10 @@ exercised on Windows unless an item says who exercised it.
   Mac.
 - [ ] **QCBridgeAE** `main`: this repo. A1–A4, A6 and A3 are done; A5 and A7
   are what Windows owes.
-- [ ] **QCBridge** (the Blender bridge): the agent and the quinn transport
-  live on the **`spike/quinn`** branch, not `main`. `main` is the released
-  zmq-only addon (0.1.6) and is deliberately frozen. Do not look for `agent/`
-  on `main` — it is not there.
+- [ ] **QCBridge** (the Blender bridge): `main`. The agent line
+  (`spike/quinn`) was merged into `main` on 2026-09-23; the zmq transport
+  remains in it as the frozen fallback. `spike/quinn` is now behind `main`
+  — do not use it.
 
 ## QCBridgeAE — phase A5 (PLAN.md)
 
@@ -518,13 +519,10 @@ decides when the coordinated release can happen.
   Blender, which needs a desktop. macOS gets a login item. Neither exists.
 - [ ] **Sign the agent.** Unsigned binaries that open listening sockets and
   launch other programs are exactly what endpoint protection objects to.
-- [ ] **Which addon version ships, and from which branch?** `main` is the
-  released zmq-only 0.1.6. Everything — the agent, quinn, native capture —
-  is on `spike/quinn`, now well ahead. **This is an open decision, not a
-  task**: either merge the agent line to `main` and cut an 0.2.0 once Windows
-  passes, or keep `main` as the zmq release branch and treat the agent as a
-  separate product. Nothing else in this section can be finished until it is
-  settled.
+- [ ] **Which addon version ships.** Decided 2026-09-23: the agent line is
+  merged into `main`; the zmq transport stays as the fallback. The manifest
+  still says 0.1.6 — the bump (0.2.0, presumably) is a release act for the
+  macOS owner once Windows passes, not a task here.
 - [ ] **The pyzmq wheel matrix.** The frozen zmq transport still needs a
   wheel per Python version in `qcbridge/wheels/`. The agent path is
   stdlib-only and needs none — so if the agent becomes the default, most of
