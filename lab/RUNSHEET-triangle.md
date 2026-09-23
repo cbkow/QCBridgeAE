@@ -71,7 +71,12 @@ material in what you write down.*
    (mac root ↔ win root of the same share). Open a scene on the Mac whose
    images and caches live under that root. On the replica: relative and
    absolute images resolve, the missing one is counted on the host's
-   panel. This is the item the Windows notes flagged as unit-tested only.
+   panel. This is the item the Windows notes flagged as unit-tested only,
+   and it is also the mapping smoke's fifth check
+   (`relative_image_mapped_to_replica_root`): on a same-OS pair the
+   two-column table cannot express it, so a mac host's `/Volumes/…` paths
+   on the wire here are the first real evidence for it. Write that row
+   down explicitly.
 4. **Shared cache root on SMB.** `cache_root` pointed at the share on both
    sides — once as a UNC path on Windows, once as a mapped drive. Bake a
    cloth or particle cache on the host; the replica reads the same frames
