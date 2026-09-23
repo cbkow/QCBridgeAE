@@ -18,6 +18,10 @@ points to, in that order.*
 5. **`RUNSHEET-triangle.md`** — once both sides are caught up (they are,
    as of 2026-09-23 afternoon): the paired session, step by step, for
    Phase 4 and the two-machine items.
+6. **`ONE-SEAT.md`** — how the paired legs are actually driven since
+   2026-09-23 afternoon: the Mac session over SSH, with the scripts in
+   `lab/tools/win/`. The Windows session's part is the Windows-only build
+   and verify work, not the paired runs.
 
 Then, per repo, the documents the checklist cites when you get there:
 QCView's `scripts/RELEASE.md`; QCBridgeAE's `PLAN.md`; QCBridge's
