@@ -714,9 +714,10 @@ decides when the coordinated release can happen.
   `qcbridge/ring1/transport_agent.py` already looks in `qcbridge/bin/` first,
   before the cargo build dirs — that is the shipping path and nothing puts a
   binary there yet. One per platform.
-- [ ] **Autostart the agent at login.** The design calls for a Windows logon
+- [~] **Autostart the agent at login.** The design calls for a Windows logon
   task **in the interactive user session, not a service** — it launches
   Blender, which needs a desktop. macOS gets a login item. Neither exists.
+  *Windows 2026-09-23:* the logon task exists (`agent/windows/logon-task.ps1`) and is **registered and running on this box** as a replica with the tray (interactive session, limited rights) — pointing at the cargo build for now, `qcbridge/bin` when the extension bundles it. The Blender 5.2 extension folder here was a stale August copy of the zmq-only 0.1.6 (no agent line; today's tests imported the repo directly and never touched it); it is now a directory junction to the working tree, and Blender enables it and finds the agent and the capture helper. The macOS login item is still the Mac's.
 - [ ] **Sign the agent.** Unsigned binaries that open listening sockets and
   launch other programs are exactly what endpoint protection objects to.
 - [x] **Which addon version ships.** Decided 2026-09-23: the agent line is
