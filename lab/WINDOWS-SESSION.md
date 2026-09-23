@@ -15,6 +15,9 @@ points to, in that order.*
 4. **`TRACKING-windows.md`** — the checklist. Every item is something the
    Mac side landed that Windows must build, port or verify, with what
    counts as evidence. You tick items; nobody else does.
+5. **`RUNSHEET-triangle.md`** — once both sides are caught up (they are,
+   as of 2026-09-23 afternoon): the paired session, step by step, for
+   Phase 4 and the two-machine items.
 
 Then, per repo, the documents the checklist cites when you get there:
 QCView's `scripts/RELEASE.md`; QCBridgeAE's `PLAN.md`; QCBridge's
