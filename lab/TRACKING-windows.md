@@ -360,6 +360,79 @@ so the beacons read as siblings; do not move them.
   `test_set_config_round_trip_and_needs_restart` and
   `test_discover_by_direct_probe_finds_the_replica`.
 
+## QCBridge — the sync after the audit (2026-09-23, branch `spike/quinn`)
+
+One day of audit-driven work on the host↔replica sync, all of it proven on
+the Mac only: `SYNC-AUDIT.md`, `COVERAGE.md` and `CACHES.md` in the QCBridge
+repo are the record, `smokes/` the proof. Nine commits, `e816205..af56973`.
+The shape of what changed, for the Windows side to know what to exercise:
+a fast QUIC lane for tier-1 deltas with a merge rule, byte-based credits,
+reconnect/resync recovery, ~50 detection holes closed, a shared cache root
+for simulations, local-edit detection on the replica, and path mapping from
+any host OS. Nothing in it is `#[cfg(unix)]`-gated, so the risk is
+behavioural, not build.
+
+- [ ] **Build and unit suite.** `cargo build --release` in `agent/`, then
+  `python -m pytest -q` → **101 passed**, including
+  `test_fast_lane_is_not_behind_a_cold_blob`,
+  `test_agent_advertises_byte_credits` and `test_localize_any_…`. The
+  discovery test binds UDP/4246 and fails while any replica agent is
+  running on the machine — that is the port, not the code.
+- [ ] **The smoke runners are zsh.** `run_smoke*.sh`, `bench_latency.sh`,
+  `coverage/run_coverage.sh` all assume zsh, `mktemp -d /tmp/…`, `kill -9`
+  and (mapping) `ln -s`. The Python halves are portable; the runners are
+  not. Either port them to PowerShell or run the two Blender halves by hand
+  with the same arguments — but run them: the 21-check, `reconnect` (6
+  checks: kill and restart the replica mid-session, drop a frame, edit the
+  replica by hand), `cache` (5), `mapping` (5), and the coverage survey
+  (123 actions, 118 cross on the Mac).
+- [ ] **The shared cache root on Windows paths.** `cache_root` (addon
+  preference, `subtype='DIR_PATH'`) is joined with `os.path.join` and
+  `os.makedirs`; the host writes `<root>/<file>/<uuid>/<sim>` and Blender
+  writes `.bphys` frames there. Confirm a UNC path and a mapped drive both
+  work as the root, that `bpy.path.abspath` on the preference resolves a
+  `//`-relative root sensibly, and that the replica's "frames exist" test
+  (`any(f.endswith('.bphys') …)`) sees files the host just wrote on the SMB
+  share without a delay that makes it keep the cache in memory.
+- [ ] **The two cache hazards are Blender behaviour — confirm they hold on
+  Windows.** (7) An unbaked external cache on the replica writes into the
+  shared directory and poisons the host's bake; (8) re-setting
+  `use_disk_cache`/`use_external` on an already-external evaluated cache
+  and seeking wipes the directory. `probes/caches/shared_dir_*.py` reproduce
+  both headlessly; run them with `S=<scratch>` set. If either differs on
+  Windows, `bootstrap.localize_object_paths` is the code that relies on it.
+- [ ] **`use_disk_cache` is ignored on an unsaved file** (probed on the Mac
+  2026-09-18; the host now refuses to externalize with a panel note). Verify
+  the same on Windows so the note is not a false alarm there.
+- [ ] **Path mapping from a mac host — the real cross-OS case.** A bootstrap
+  carries the host's native paths; a Windows replica must translate
+  `/Volumes/…` absolute paths through the table (`pathmap.localize_any`,
+  unit-tested only) and count what it cannot resolve by *existence*
+  (`os.path.exists` on the mapped path). This was the mapping smoke's
+  finding and it cannot be exercised on one machine. Two machines, a mac
+  host with an absolute texture path under the mapped root and one outside
+  it: the first must load, the second must show as "1 unmapped" on both
+  panels.
+- [ ] **The reconnect smoke's expectations.** After the replica is killed and
+  restarted, the host re-handshakes within ~1.5 s (QUIC idle timeout 3 s,
+  keepalive 500 ms) and re-bootstraps; a dropped tier-1 frame is detected
+  as a gap on the fast lane and the host ships a bootstrap unasked. On
+  Windows, kill the replica's Blender *and* its agent (they are separate
+  processes; `--exit-with-addon` takes the agent down with Blender when it
+  exits cleanly, `taskkill /F` does not give it the chance).
+- [ ] **Latency bench numbers to compare.** Mac loopback after the tuning:
+  tier-1 103–114 ms p50, hot ~30 ms, sweep-path ~180 ms, a delta behind a
+  640k-vertex blob ~150–165 ms, the blob itself ~300 ms. The Windows
+  numbers go in `spikes/parity/results/` next to the Mac ones; a tier-1
+  above ~150 ms or a sweep above ~300 ms means something in the tick/sweep
+  path behaves differently there (timer resolution is the usual suspect).
+- [ ] **The replica's local-edit detector** is a `depsgraph_update_post`
+  handler with time-based attribution (1.5 s touch grace, 3 s after a blob,
+  0.5 s after a frame change). It has no platform code, but its false
+  positives depend on how fast Blender's depsgraph reports after a blob on
+  the machine; if the Windows replica shows "edited here" without anyone
+  touching it, widen `_BLOB_GRACE` in `replica_apply.py` and say so.
+
 ## Packaging and shipping — the actual release gate (2026-09-22)
 
 Building is not releasing. Each of the three has to produce something a user
