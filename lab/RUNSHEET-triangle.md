@@ -130,9 +130,16 @@ the rung, the SRT latency setting and the measured delay.
   side and lights it; dual view with nothing loaded shows the transport
   and two lanes; drag the viewport to move the window; a Chinese-named
   PNG sequence loads. Each has a tracker section saying what to look at.
-- **Mac, from the Windows session's flags:** the two "flagged for the Mac
-  side" lines in the Windows notes (a replica frame count that differed;
-  a conversion edge in the A5 spine). Read them before the session.
+- **Mac, from the Windows session's flags — resolved 2026-09-23:** the
+  "8 bootstraps on Windows against 1 on the Mac" compared against the
+  Mac's *first* survey table; the Mac's final run (`full-agent-final.json`)
+  has the identical replica stats, 8 bootstraps included. Seven of them
+  are the known cost of a `Scene`-level structural change (camera switch,
+  view layer, compositor node, rigid-body world, scene keyframes): `Scene`
+  has no tier-2 blob form, so the host resends a bootstrap. Same on both
+  platforms, correctness intact; a cheaper resend for `Scene` is a QCBridge
+  improvement, not a Windows difference. The pid-recycling liveness window
+  is parked as a ring-format v4 item, as the Windows notes say.
 
 ## When to stop
 

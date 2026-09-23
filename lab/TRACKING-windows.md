@@ -428,6 +428,17 @@ its conclusions need a Windows twin before they are safe to build on.
   is out of the transport entirely and `video_listen` is deleted. Nothing for
   Windows to inherit.
 
+## QCBridge — the bootstrap count the Windows survey flagged (answered 2026-09-23)
+
+- [-] **"8 bootstraps on Windows against 1 on the Mac."** Not a difference:
+  the 1 is the Mac's first survey table, before the day's fixes; the Mac's
+  final run (`spikes/parity/results/2026-09-23-sync-coverage/full-agent-final.json`)
+  has the same replica stats as Windows, 8 bootstraps included. Seven are
+  `Scene`-level structural changes escalating to a tier-2 that `Scene`
+  cannot express as a blob, so the host resends a bootstrap — a cost item
+  on both platforms (a per-Scene resend would be the fix), tracked as a
+  QCBridge improvement, not here.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
