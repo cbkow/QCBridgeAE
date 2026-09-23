@@ -91,11 +91,11 @@ The producer side, so this comes first.
   HANDOFF §F16C. Run `convert_test` (it must match the portable scalar bit
   for bit) and `qcbae-convbench`; results to `lab/results/`.
   *Windows 2026-09-23:* runtime CPUID, bit-exact against VCVTPS2PH over 1,048,532 patterns; 4K A6 pass 6.5 ms F16C vs 73.7 ms portable (11.4x), memcpy floor ~2.4x the Mac's. `lab/results/2026-09-23-a5-windows-spine/`.
-- [~] **The Transmit device on Windows.** Build `qcbae-transmit` as the
+- [x] **The Transmit device on Windows.** Build `qcbae-transmit` as the
   Premiere SDK's Transmitter sample does, and install it in MediaCore
   (HANDOFF's table).
-  *Windows 2026-09-23:* blocked: the Premiere Pro SDK is not on this machine (the AE SDK 25.6 is). The CMake target is also `APPLE AND EXISTS`; the Windows `.prm` is real work once the SDK arrives. **Stop-and-ask item.**
-- [ ] **Re-measure host behaviour; don't inherit it.** macOS findings
+  *Windows 2026-09-23:* the Premiere Pro SDK 26.0 arrived at 13:00; `qcbae-transmit` builds as `QCBridgeAE-Transmit.prm` (`764a696`: PRWIN_ENV, dllexport entry, %TEMP% log, GetModuleFileName host detection), installed into MediaCore by `packaging/windows/install-transmit.ps1` (UAC), and **After Effects 2026 loads it**: `--- module load, host interface v4 --- / startup in After Effects: ring /qcbae-ae`. With the device enabled under Video Preview AE published 1920x1080 32f frames and QCView on Windows went LIVE on `qcbae://ae` (240 frames, ring copy 1.2 ms mean). Notes: the A5 folder's addendum.
+- [~] **Re-measure host behaviour; don't inherit it.** macOS findings
   (`lab/results/2026-09-21-a4-transmit-probe/`): the host picks 32f when
   offered; frames arrive bottom-up; AE flattens alpha over the comp colour,
   while Premiere sends straight alpha; AE's inTime is -1 and always
@@ -103,6 +103,7 @@ The producer side, so this comes first.
   stream unless the background preference is unticked; the device is never
   unloaded on quit; each viewer change pushes 2 frames. Any of these can
   differ on Windows.
+  *Windows 2026-09-23:* AE picks 32f but hands **BGRA**, not ARGB (the device converts both); focus loss pauses the stream the same way (activation 3 → video off → PausedFocus, back on return). Unload-on-quit, bottom-up and alpha flattening pending (AE still up; pixels need a person). Premiere not yet tried. A5 notes addendum.
 - [-] **`qcbae-probe`**: `produce` and `dump` should port with the ring;
   `view` is Metal and needs a D3D11 twin, or skip it and use QCView as the
   viewer.
@@ -550,12 +551,13 @@ decides when the coordinated release can happen.
   SDK". macOS is untouched too, so this is a shared piece of work, not a
   Windows-only one — but Adobe's plugin loading is stricter on Windows and
   worth checking early.
-- [ ] **Where the plugin goes on Windows.** The macOS path is
+- [x] **Where the plugin goes on Windows.** The macOS path is
   `/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/`. Confirm
   the Windows equivalent and whether it needs admin.
 
 ### QCBridge (Blender)
 
+  *Windows 2026-09-23:* `%PROGRAMFILES%\Adobe\Common\Plug-ins.0\MediaCore\`, confirmed — AE 2026 loads a `.prm` from there. Needs admin to copy (`packaging/windows/install-transmit.ps1` self-elevates), not to run.
 - [ ] **Bundle the agent binary with the extension.** `find_agent` in
   `qcbridge/ring1/transport_agent.py` already looks in `qcbridge/bin/` first,
   before the cargo build dirs — that is the shipping path and nothing puts a

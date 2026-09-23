@@ -153,17 +153,66 @@ Apple-only). Builds, and the app starts and plays with it in. The live path
 itself has nothing to read until the Transmit device exists on Windows —
 see below.
 
+## Addendum, 13:00 — the Transmit device on Windows
+
+The Premiere Pro SDK (26.0) arrived at 13:00 and went into
+`private/sdk/PremiereProSDK`. `qcbae-transmit` builds as
+`QCBridgeAE-Transmit.prm` the way the SDK's Transmitter sample does
+(`PRWIN_ENV`, `/MD`, the entry exported with `__declspec(dllexport)`,
+no PiPL, no manifest); four portable-isms went (`/tmp` → `%TEMP%`,
+`getprogname` → `GetModuleFileName`, `clock_gettime` → `steady_clock`,
+the visibility attribute → `QCBAE_EXPORT`). Commit `764a696`. The module
+exports `xTransmitEntry` at ordinal 1 and depends only on the VC runtime
+the hosts already ship. `packaging/windows/install-transmit.ps1` copies it
+into `%PROGRAMFILES%\Adobe\Common\Plug-ins.0\MediaCore\` through a
+UAC prompt — the folder is not writable otherwise, which answers the
+tracker's "does it need admin" (yes, for the copy; not to run).
+
+**After Effects 2026 loads it and publishes; QCView on Windows goes live
+on it.** The device log (`%TEMP%\qcbridgeae-transmit.log`):
+
+```
+--- module load, host interface v4 ---
+startup in After Effects: ring /qcbae-ae, ticks/s 254016000000
+instance 241: 1920x1080
+instance 241: activation event 0, video 1 -> state 0
+ring /qcbae-ae created, 16200 KiB per slot
+published 1 (1920x1080 BGRA)
+instance 241: activation event 3, video 0 -> state 1
+instance 241: activation event 2, video 1 -> state 0
+published 240 (1920x1080 BGRA)
+```
+
+and QCView: `ring /qcbae-ae open (producer pid …)`, then `LIVE — first
+frame seq 1 1920x1080 RGBA16F row 15360 flags 0x0, centre RGBA half bits
+2a44 2e36 31be 3c00`, then `240 frames 1920x1080 in 81.15 s = 2.96 fps;
+ring copy mean 1.180 max 15.252 ms` (interactive scrubbing, not playback).
+The named file mapping, the liveness check and the F16C pass are all on
+that path: this is the first frame ever to cross the Windows ring from a
+real host.
+
+Host behaviours, re-measured rather than inherited (`2026-09-21-a4-transmit-probe`):
+
+| | macOS | Windows |
+| --- | --- | --- |
+| pixel format offered 32f → picked | 32f, **ARGB** | 32f, **BGRA** (`PrPixelFormat_BGRA_4444_32f`) — AE hands Premiere's order on Windows; the device already converts both |
+| focus loss | video off unless the background preference is unticked | same: activation event 3 → video 0 → PausedFocus; event 2 → video 1 on return |
+| device unloaded on quit | never | *pending — AE is still up; the log will show `module unload` or not* |
+| bottom-up rows, alpha flattening | measured | *pending: a person at the box confirms the picture is upright and the alpha is flat — the log cannot see pixels* |
+| per-viewer-change frame count, inTime -1 | 2 frames, -1 | not instrumented in the product device; the probe (`QCBridgeAE-Transmit-Probe.prm`, also built) measures it when installed |
+
+The VC runtime dependency (`MSVCP140`, `VCRUNTIME140`) is a packaging
+note for A7: the Adobe hosts ship it, a clean machine without them may
+not.
+
 ## Not done, and why
 
-- **`qcbae-transmit` on Windows.** The Premiere Pro SDK is not on this
-  machine (the AE SDK 25.6 for Windows was, and is unpacked into
-  `private/sdk/AfterEffectsSDK`; the Mac side offered a 26.5 macOS package,
-  which cannot reach this box and would not change this). The CMake target
-  is also `APPLE AND EXISTS` — the Windows half of it (a `.prm` DLL
-  exporting `xTransmitEntry`, installed to MediaCore) is real work that
-  starts when the SDK arrives. **Stop-and-ask item: the Premiere SDK.**
-- **Host-behaviour re-measurement** (32f pick, bottom-up, alpha, focus
-  loss, unload on quit) — needs the device.
+- ~~`qcbae-transmit` on Windows~~ — done in the addendum above, once the
+  SDK arrived. The AE SDK 25.6 for Windows is unpacked into
+  `private/sdk/AfterEffectsSDK` as well (the AEGP target stays Apple-only).
+- **Host-behaviour re-measurement** — the table above; two rows wait for a
+  person at the box and one for AE to quit. Premiere Pro 2026 is installed
+  here and not yet tried.
 - **`qcbae-probe`** — Metal; `produce`/`dump` would port with the ring,
   `view` needs D3D11. QCView is the viewer on Windows; skipped.
 - The **D3D11 texture-format equivalence** check (`texture_format_test.mm`'s
