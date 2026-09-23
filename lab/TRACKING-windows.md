@@ -378,6 +378,7 @@ so the beacons read as siblings; do not move them.
   relies on already), that a UNC path and a mapped drive both work, and
   that a stale entry from a machine that crashed is dropped after 60 s
   rather than offered.
+  *Windows 2026-09-23:* not exercised (two-machine / the studio share). One thing learned on this box applies: a rename over a file another process holds open fails on Windows (`PermissionError`) where macOS always succeeds — the coverage survey's own JSON dump hit it. The phonebook writer should retry the rename briefly; the agent's reader is open-read-close, so the window is small but real.
 - [x] **`pid_alive` returns `None` on Windows**, so the single-instance guard
   cannot refuse a second agent there: it needs `OpenProcess(SYNCHRONIZE)` +
   `WaitForSingleObject(h, 0)` via `windows-sys`. Same answer as the
@@ -444,7 +445,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   replica by hand), `cache` (5), `mapping` (5), and the coverage survey
   (123 actions, 120 of 122 surveyed cross on the Mac; its `t2`/`t1` columns are the blob
   and delta cost per action — read them, not just the status).
-  *Windows 2026-09-23:* ported to CPython (`smokes/run_smokes.py`): 21/21, reconnect 6/6, cache 5/5, mapping 4/5 (the 5th is not expressible on a same-OS pair — notes), bench both transports, coverage survey. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
+  *Windows 2026-09-23:* ported to CPython (`smokes/run_smokes.py`): 21/21, reconnect 6/6, cache 5/5, mapping 4/5 (the 5th is not expressible on a same-OS pair — notes), bench both transports, coverage survey 120 crossed / 2 not / 2 piggybacked — the Mac's rows exactly, median 249 ms; replica counted 8 bootstraps vs the Mac's 1 (Scene-level actions escalate to an unsupported Scene blob → auto bootstrap; cost, not correctness — flagged). The survey host's `os.replace` of its JSON hit a Windows rename-over-open-file error once; retried now (`smokes/_atomic.py`, `3a38b52`). QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
 - [~] **The shared cache root on Windows paths.** `cache_root` (addon
   preference, `subtype='DIR_PATH'`) is joined with `os.path.join` and
   `os.makedirs`; the host writes `<root>/<file>/<uuid>/<sim>` and Blender
@@ -499,13 +500,14 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   agent→Blender) does not stall on Windows' default socket buffers the way
   it does not on macOS — the `heavy` bench row is the measurement.
   *Windows 2026-09-23:* the heavy row crossed 16/16 with 0 lost; slower than the Mac for the reason above, no stall.
-- [ ] **The blob-digest gate assumes `libraries.write` is deterministic** for
+- [~] **The blob-digest gate assumes `libraries.write` is deterministic** for
   unchanged data — probed on the Mac (same bytes twice, after `update()`,
   after a move and back). If Windows builds write differently (pointer
   fields, padding), the gate never skips and the only symptom is cost: an
   undo costs ~34 blobs instead of ~6 in the survey's cost column. Run
   `QCB_COV_UNDO=1 QCB_COV_ONLY=obj_color,mesh_vertex_move,undo_after_move`
   and read the `t2` column for the undo row.
+  *Windows 2026-09-23:* the gate skips on Windows — 27 of 102 tier-2 sends in the full survey were `unchanged blob`, so the writes are deterministic enough. The undo row itself could not be measured: `bpy.ops.ed.undo()` from the survey's timer crashes Blender 5.2.0 here (access violation in `deg_update_eval_copy_datablock`; the Mac's GUI only rewinds). Hand check: Ctrl-Z in a `QCB_DEBUG=1` host and count the skips. Flagged to the Mac side as a Blender-on-Windows difference. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
 - [ ] **Linked libraries cross by path.** A `link` message names the
   library file in the host's native form and the linked object/collection
   names; the replica maps the path (`pathmap.localize_any`), links the
