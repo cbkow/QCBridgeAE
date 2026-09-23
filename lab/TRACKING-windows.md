@@ -457,6 +457,15 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   undo costs ~34 blobs instead of ~6 in the survey's cost column. Run
   `QCB_COV_UNDO=1 QCB_COV_ONLY=obj_color,mesh_vertex_move,undo_after_move`
   and read the `t2` column for the undo row.
+- [ ] **Linked libraries cross by path.** A `link` message names the
+  library file in the host's native form and the linked object/collection
+  names; the replica maps the path (`pathmap.localize_any`), links the
+  names, and counts a file it cannot find as unmapped. Two machines: link
+  an object from a `.blend` under the mapped root on the host and confirm
+  it appears on the Windows replica; link one from outside every mapping
+  and confirm "1 unmapped" on both panels. A library the replica had to
+  repoint is `reload()`ed — watch for a Windows-specific stall there on a
+  large library.
 - [ ] **The replica's local-edit detector** is a `depsgraph_update_post`
   handler with time-based attribution (1.5 s touch grace, 3 s after a blob,
   0.5 s after a frame change). It has no platform code, but its false
