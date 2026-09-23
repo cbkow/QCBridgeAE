@@ -300,6 +300,34 @@ its conclusions need a Windows twin before they are safe to build on.
   is out of the transport entirely and `video_listen` is deleted. Nothing for
   Windows to inherit.
 
+## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
+
+Native capture (S7) is out of scope for this release *because the ffmpeg
+capture path works* — and that has only ever been shown on the Mac
+(avfoundation → VideoToolbox). The Windows run that exists
+(`spikes/parity/results/2026-09-17-win-loopback/`) fed NVENC a synthetic
+`testsrc`, not the screen. The replica's real Windows argv is in
+`qcbridge/ring0/pixel_path.py`: `ddagrab=output_idx=0:framerate=<fps>:draw_mouse=0`
+→ `hevc_nvenc` (main10, `-tune ull -delay 0 -bf 0`), GPU-resident, the display
+*is* the viewport in kiosk mode. Phase 4's first item silently depends on it.
+
+- [ ] **The bundled ffmpeg has `ddagrab`.** QCView's Windows ffmpeg
+  (`%LOCALAPPDATA%\QCView\bin\ffmpeg.exe`) needs a build with D3D11VA and the
+  `ddagrab` filter (`ffmpeg -filters | findstr ddagrab`). The 09-17 notes
+  confirm libsrt and hevc_nvenc; they do not mention ddagrab.
+- [ ] **A replica Blender in kiosk mode streams its screen.** Start the replica
+  with streaming on, receive in QCView (or `probe_reader.py`), and confirm the
+  picture is the Blender viewport at the configured fps, with no cursor. Note
+  `output_idx=0`: on a multi-monitor box the capture is the *first* output,
+  which may not be the one Blender is on — say which monitor you used.
+- [ ] **The 4:4:4 rung** (`hevc_10_444_50`) takes the CPU path
+  (`hwdownload,format=bgra,format=yuv444p10le`, profile `rext`). Confirm it
+  actually produces 4:4:4 at the receiver — the code comment says NVENC
+  silently downgrades 4:4:4 on GPU frames, so verify receiver-side.
+- [ ] **Glass-to-glass with ddagrab**, the way Phase 4 asks: the synthetic
+  pipe number is 43 ms at 1080p60; the screen-capture number is the one a
+  user gets. Write both.
+
 ## QCBridge — the agent after the quinn port (2026-09-22, then branch `spike/quinn`, now `main`)
 
 Kyber is gone; the transport is plain `quinn`. The Mac side builds, passes

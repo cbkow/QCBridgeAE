@@ -191,6 +191,8 @@ get (an update channel, native capture) — honestly.
 - **QCBridge native capture (S7)** — DDA/WGC → NVENC inside the agent. The
   hook exists (`qcb-capture-win.exe` beside the agent); the binary does
   not. Largest single piece of Windows work still ahead and **not a
-  release blocker**: the ffmpeg capture path works.
+  release blocker**: the ffmpeg capture path works — on the Mac. Its Windows
+  twin (`ddagrab` → NVENC) is unproven and has its own tracker section; Phase 4
+  item 1 is what proves it.
 - **A/B follow mode** (QCView) and **zero-copy ingest** (QCBridgeAE) — parked
   on the macOS side; not Windows work.
