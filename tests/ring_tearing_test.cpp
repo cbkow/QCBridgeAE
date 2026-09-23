@@ -10,6 +10,11 @@
 // The consumer deliberately dawdles so the producer laps it. That is the
 // interesting case: it forces slot reuse while a reader holds one, which is
 // exactly what reader_claim exists to survive.
+//
+// The second process is a fork() on POSIX. Windows has no fork, so there the
+// test re-runs its own executable with `--consumer` (A5); the tally the two
+// report into is a second named mapping instead of an anonymous shared one.
+// The producer/consumer code is the same on both.
 
 #include "common/surface/shared_ring.h"
 
@@ -21,11 +26,22 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
-#include <csignal>
-#include <sys/mman.h>
-#include <sys/wait.h>
 #include <thread>
-#include <unistd.h>
+
+#if defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#else
+#  include <csignal>
+#  include <sys/mman.h>
+#  include <sys/wait.h>
+#  include <unistd.h>
+#endif
 
 using namespace qcbae;
 
@@ -104,14 +120,79 @@ int run_consumer(Tally* tally) {
     return 0;
 }
 
+// --- the second process, per platform ---------------------------------------
+
+#if defined(_WIN32)
+constexpr const wchar_t* kTallyName = L"Local\\qcbae-ringtest-tally";
+
+struct Child {
+    HANDLE process = nullptr;
+    bool start(const char* exe_path) {
+        std::string cmd = std::string("\"") + exe_path + "\" --consumer";
+        STARTUPINFOA si {}; si.cb = sizeof si;
+        PROCESS_INFORMATION pi {};
+        if (!::CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+            std::fprintf(stderr, "CreateProcess failed (%lu)\n", ::GetLastError()); return false;
+        }
+        ::CloseHandle(pi.hThread);
+        process = pi.hProcess;
+        return true;
+    }
+    void kill() { ::TerminateProcess(process, 9); wait(); }
+    int  wait() {
+        ::WaitForSingleObject(process, INFINITE);
+        DWORD code = 1; ::GetExitCodeProcess(process, &code);
+        ::CloseHandle(process); process = nullptr;
+        return static_cast<int>(code);
+    }
+};
+
+Tally* map_tally(bool create, HANDLE* out) {
+    HANDLE h = create
+        ? ::CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(Tally), kTallyName)
+        : ::OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, kTallyName);
+    if (h == nullptr) { std::fprintf(stderr, "tally mapping failed (%lu)\n", ::GetLastError()); return nullptr; }
+    void* p = ::MapViewOfFile(h, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, sizeof(Tally));
+    if (p == nullptr) { std::fprintf(stderr, "tally view failed (%lu)\n", ::GetLastError()); ::CloseHandle(h); return nullptr; }
+    *out = h;
+    return create ? new (p) Tally() : static_cast<Tally*>(p);
+}
+#else
+struct Child {
+    pid_t pid = -1;
+    Tally* tally = nullptr;
+    bool start(const char*) {
+        pid = ::fork();
+        if (pid < 0) { std::perror("fork"); return false; }
+        if (pid == 0) { _exit(run_consumer(tally)); }
+        return true;
+    }
+    void kill() { ::kill(pid, SIGKILL); ::waitpid(pid, nullptr, 0); }
+    int  wait() { int status = 0; ::waitpid(pid, &status, 0); return WIFEXITED(status) ? WEXITSTATUS(status) : 1; }
+};
+#endif
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+#if defined(_WIN32)
+    if (argc > 1 && std::strcmp(argv[1], "--consumer") == 0) {
+        HANDLE th = nullptr;
+        Tally* tally = map_tally(false, &th);
+        if (tally == nullptr) return 2;
+        return run_consumer(tally);
+    }
+    HANDLE th = nullptr;
+    Tally* tally = map_tally(true, &th);
+    if (tally == nullptr) return 1;
+#else
+    (void)argc;
     // Tally lives in its own shared mapping so both processes report into it.
     void* shared = ::mmap(nullptr, sizeof(Tally), PROT_READ | PROT_WRITE,
                           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (shared == MAP_FAILED) { std::perror("mmap tally"); return 1; }
     auto* tally = new (shared) Tally();
+#endif
 
     SharedRing ring;
     if (!ring.create(kName, kBytes, 3)) {
@@ -119,9 +200,11 @@ int main() {
         return 1;
     }
 
-    const pid_t pid = ::fork();
-    if (pid < 0) { std::perror("fork"); return 1; }
-    if (pid == 0) { _exit(run_consumer(tally)); }
+    Child child;
+#if !defined(_WIN32)
+    child.tally = tally;
+#endif
+    if (!child.start(argv[0])) return 1;
 
     // Wait for the consumer to have the ring open before publishing.
     for (int i = 0; i < 5000 && tally->consumer_ready.load() == 0; ++i) {
@@ -129,7 +212,7 @@ int main() {
     }
     if (tally->consumer_ready.load() == 0) {
         std::fprintf(stderr, "consumer never became ready\n");
-        ::kill(pid, SIGKILL); ::waitpid(pid, nullptr, 0);
+        child.kill();
         return 1;
     }
 
@@ -153,8 +236,7 @@ int main() {
     }
     tally->producer_done.store(1);
 
-    int status = 0;
-    ::waitpid(pid, &status, 0);
+    const int consumer_rc = child.wait();
 
     const uint64_t seen = tally->seen.load();
     const uint64_t torn = tally->torn.load();
@@ -170,6 +252,7 @@ int main() {
     std::printf("out of order   %" PRIu64 "\n", back);
 
     bool ok = true;
+    if (consumer_rc != 0) { std::printf("FAIL: consumer exited %d\n", consumer_rc); ok = false; }
     if (torn != 0)  { std::printf("FAIL: torn frames\n"); ok = false; }
     if (mism != 0)  { std::printf("FAIL: sidecar disagreed with pixels\n"); ok = false; }
     if (back != 0)  { std::printf("FAIL: sequence went backwards\n"); ok = false; }

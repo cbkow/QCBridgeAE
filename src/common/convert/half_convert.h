@@ -17,8 +17,10 @@
 // reports whether any inf or NaN came out, and the sidecar flags the frame
 // (kFlagHasInf, kFlagHasNaN) so QCView can surface them.
 //
-// The hardware path (NEON vcvt) and the portable path agree bit for bit,
-// which tests/convert_test.cpp holds them to — including NaN payloads.
+// The hardware paths (NEON vcvt on AArch64, F16C vcvtps2ph on x86 -- chosen
+// at run time from CPUID, since F16C is not in the x86-64 baseline) and the
+// portable path agree bit for bit, which tests/convert_test.cpp holds them
+// to — including NaN payloads.
 //
 // No SDK types: this builds and is tested without the Adobe SDKs, like the
 // rest of src/common.
@@ -50,9 +52,15 @@ struct ConvertResult {
 };
 
 // Writes `src` into `dst` as top-down RGBA16F rows, `dst_stride` bytes apart
-// (which must be >= width * 8). Uses NEON where available, else the portable
-// path. x86 F16C is phase A5's (lab/HANDOFF-windows.md).
+// (which must be >= width * 8). Uses NEON or F16C where available, else the
+// portable path.
 ConvertResult convert_32f_to_rgba16f(const ConvertSource& src, void* dst, size_t dst_stride);
+
+// Whether convert_32f_to_rgba16f will take a hardware path on this machine.
+// On x86 without F16C it is the portable path, 4.7x slower at 4K (measured
+// on the macOS side, lab/HANDOFF-windows.md); a host on such a machine
+// should say so rather than silently drop frames.
+bool convert_has_hardware_path();
 
 // The portable path, exposed so tests can hold the fast path to it.
 ConvertResult convert_32f_to_rgba16f_portable(const ConvertSource& src, void* dst, size_t dst_stride);

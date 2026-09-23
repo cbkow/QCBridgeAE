@@ -8,12 +8,32 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
-#include <unistd.h>
+#if defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#else
+#  include <unistd.h>
+#endif
 
 using namespace qcbae;
 
 namespace {
 int failures = 0;
+
+uint64_t page_size() {
+#if defined(_WIN32)
+    SYSTEM_INFO si {};
+    ::GetSystemInfo(&si);
+    return static_cast<uint64_t>(si.dwPageSize);
+#else
+    return static_cast<uint64_t>(getpagesize());
+#endif
+}
 void check(bool cond, const char* what) {
     std::printf("%-58s %s\n", what, cond ? "ok" : "FAIL");
     if (!cond) ++failures;
@@ -38,7 +58,7 @@ int main() {
     // ADDRESS the GPU is handed. Checking the proxy instead of the real thing
     // is how a 16-byte misalignment reached Metal in the first place.
     {
-        const uint64_t ps = static_cast<uint64_t>(getpagesize());
+        const uint64_t ps = page_size();
         check(producer.header()->pixels_offset % ps == 0, "pixel offset within a slot is page-aligned");
         check(producer.header()->slots_offset % ps == 0, "slot region starts on a page boundary");
         bool every_slot_aligned = true;
@@ -122,6 +142,41 @@ int main() {
     producer.set_host_state(HostState::Retired);
     check(consumer.host_state() == HostState::Retired, "consumer sees Retired");
     check(SharedRing().host_state() == HostState::Retired, "an unopened ring reads as Retired");
+
+    // --- Liveness -----------------------------------------------------------
+    // The consumer's only truth about a producer that quit without unlinking
+    // (A5: kill(pid, 0) on POSIX, OpenProcess + WaitForSingleObject on Windows).
+    check(process_alive(producer.header()->producer_pid), "this process reads as alive");
+    check(!process_alive(0), "pid 0 reads as dead");
+    check(!process_alive(0x7FFFFFF0u), "an absurd pid reads as dead");
+
+    // --- Replacing a ring a consumer still holds -----------------------------
+    // The producer goes away (its host quit, or reset the module) and comes
+    // back under the same name while the consumer still has the old mapping
+    // open. POSIX: the old name is unlinked, the new create() succeeds at
+    // once, the consumer keeps reading the stale mapping until it notices the
+    // pid is gone. Windows cannot unlink: the name lives while the consumer
+    // holds it, so create() marks the old mapping Retired and reports the
+    // held name; the consumer honours Retired, and the next create() wins.
+    {
+        producer = SharedRing();   // the old producer's own handle is gone
+        SharedRing second;
+        const bool created = second.create("/qcbae-unit", 64 * 1024);
+#if defined(_WIN32)
+        check(!created, "create() while a consumer holds the name reports it (Windows)");
+        check(consumer.host_state() == HostState::Retired, "the held mapping was marked Retired");
+        consumer = SharedRing();   // the consumer honours Retired: close and re-open
+        check(second.create("/qcbae-unit", 64 * 1024), "create() succeeds once the consumer let go");
+#else
+        check(created, "create() replaces the name while a consumer holds the old one (POSIX)");
+        consumer = SharedRing();
+#endif
+        check(second.valid() && consumer.open("/qcbae-unit"), "consumer re-opens the replaced ring");
+        check(second.valid() && consumer.valid()
+              && consumer.header()->producer_pid == second.header()->producer_pid,
+              "the re-opened ring is the new producer's");
+        check(consumer.host_state() == HostState::Active, "the replacement reads as Active");
+    }
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "PASS" : "FAIL",
                 failures, failures == 1 ? "" : "s");

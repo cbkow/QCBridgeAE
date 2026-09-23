@@ -37,16 +37,35 @@ void check(bool ok, const char* what) {
 float bits_to_float(uint32_t b) { float f; std::memcpy(&f, &b, 4); return f; }
 
 #if defined(__aarch64__)
+#define QCBAE_TEST_HW_REFERENCE 1
 uint16_t hw_half(float f) {
     const __fp16 h = static_cast<__fp16>(f);
     uint16_t b; std::memcpy(&b, &h, 2); return b;
+}
+#elif defined(_M_X64) || defined(__x86_64__)
+// The x86 reference is VCVTPS2PH itself, one lane at a time. Present on this
+// machine only if convert_has_hardware_path() says so; the test then holds
+// the portable conversion to it, and the frame cases hold the vector path to
+// the portable one -- so all three agree.
+#define QCBAE_TEST_HW_REFERENCE 1
+#include <immintrin.h>
+#if !defined(_MSC_VER)
+__attribute__((target("avx,f16c")))
+#endif
+uint16_t hw_half(float f) {
+    const __m128i h = _mm_cvtps_ph(_mm_set_ss(f), _MM_FROUND_TO_NEAREST_INT);
+    return static_cast<uint16_t>(_mm_extract_epi16(h, 0));
 }
 #endif
 
 // 1. The scalar conversion against the hardware, over a sweep of bit
 //    patterns plus every boundary that matters.
 void test_scalar_matches_hardware() {
-#if defined(__aarch64__)
+#if defined(QCBAE_TEST_HW_REFERENCE)
+    if (!convert_has_hardware_path()) {
+        std::printf("scalar vs hardware: skipped (no F16C on this CPU)\n");
+        return;
+    }
     std::vector<uint32_t> patterns;
     for (uint64_t b = 0; b <= 0xFFFFFFFFull; b += 4099) patterns.push_back(static_cast<uint32_t>(b));
     const float specials[] = {
@@ -74,9 +93,9 @@ void test_scalar_matches_hardware() {
             std::printf("  float 0x%08X: hardware 0x%04X, portable 0x%04X\n", b, want, got);
     }
     std::printf("scalar vs hardware: %zu patterns, %d mismatches\n", patterns.size(), mismatches);
-    check(mismatches == 0, "portable float_to_half must match hardware FCVT bit for bit");
+    check(mismatches == 0, "portable float_to_half must match the hardware conversion bit for bit");
 #else
-    std::printf("scalar vs hardware: skipped (no __fp16 hardware reference on this target)\n");
+    std::printf("scalar vs hardware: skipped (no hardware reference on this target)\n");
 #endif
 }
 
@@ -212,6 +231,7 @@ void test_lone_nonfinite() {
 }  // namespace
 
 int main() {
+    std::printf("fast path: %s\n", convert_has_hardware_path() ? "hardware" : "portable (no hardware conversion here)");
     test_scalar_matches_hardware();
     test_frames();
     test_flag_lanes();

@@ -181,13 +181,12 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
-    # Cross-process, so it needs fork(); the Windows port arrives with A5.
-    if(NOT WIN32)
-        add_executable(ring_tearing_test tests/ring_tearing_test.cpp)
-        target_link_libraries(ring_tearing_test PRIVATE qcbae_common)
-        add_test(NAME ring_tearing COMMAND ring_tearing_test)
-        set_tests_properties(ring_tearing PROPERTIES TIMEOUT 120)
-    endif()
+    # Cross-process: fork() on POSIX, a re-exec of itself as the consumer on
+    # Windows (A5). Either way two real processes share the mapping.
+    add_executable(ring_tearing_test tests/ring_tearing_test.cpp)
+    target_link_libraries(ring_tearing_test PRIVATE qcbae_common)
+    add_test(NAME ring_tearing COMMAND ring_tearing_test)
+    set_tests_properties(ring_tearing PROPERTIES TIMEOUT 120)
 
     # The Transmit conversion pass, read back the way QCView reads it, and the
     # portable half conversion held bit for bit to the hardware (PLAN.md D4).
