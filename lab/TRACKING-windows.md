@@ -439,6 +439,32 @@ its conclusions need a Windows twin before they are safe to build on.
   on both platforms (a per-Scene resend would be the fix), tracked as a
   QCBridge improvement, not here.
 
+## QCBridge — the replica agent under the logon task dies with a console-control exit (found 2026-09-23, paired run)
+
+Twice in the paired session the replica agent registered by
+`agent/windows/logon-task.ps1` ended with task result `0xC000013A`
+(`STATUS_CONTROL_C_EXIT`): once after about an hour up (the host saw
+"replica lost"), and then *every* `Start-ScheduledTask` restart died within
+a second with the same code, no crash event in the Application log. The
+same binary started through a one-line batch wrapper
+(`cd` to the release folder, `qcbridge-agent.exe --role replica > log 2>&1`)
+by an equivalent interactive one-shot task ran fine, took the host, launched
+Blender and streamed. Launched directly by the scheduler the process has a
+console of its own with nothing on stdout/stderr; behind `cmd` it has
+redirected handles. That is the only difference found.
+
+- [ ] **Find why the direct launch dies.** Reproduce with the task as
+  registered; try `-Argument` with a redirect via `cmd /c`, or build the
+  agent with `#![windows_subsystem = "windows"]` when `tray = true` (no
+  console at all; log to a file beside `agent.toml`). The fix should make the
+  logon task the reliable path; until then the wrapper is.
+- [ ] **A log file for the agent on Windows.** Its stdout is the only
+  diagnostic and the task swallows it. Write `agent.log` next to
+  `agent.toml` (rotating) from the binary, not the launcher.
+- [ ] **The visible console window is a hazard.** Started by the scheduler
+  the agent shows a console on the desktop that a user can close (that ends
+  it with this exact code). Same fix as the first item.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
