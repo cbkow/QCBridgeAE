@@ -103,7 +103,7 @@ The producer side, so this comes first.
   stream unless the background preference is unticked; the device is never
   unloaded on quit; each viewer change pushes 2 frames. Any of these can
   differ on Windows.
-  *Windows 2026-09-23:* AE picks 32f but hands **BGRA**, not ARGB (the device converts both); focus loss pauses the stream the same way (activation 3 → video off → PausedFocus, back on return). Unload-on-quit, bottom-up and alpha flattening pending (AE still up; pixels need a person). Premiere not yet tried. A5 notes addendum.
+  *Windows 2026-09-23:* AE picks 32f but hands **BGRA**, not ARGB (the device converts both); focus loss pauses the stream the same way (activation 3 → video off → PausedFocus, back on return). Premiere Pro 2026 loads the same `.prm`, hands BGRA 32f, 63 fps peak into QCView; both hosts ran into QCView at once; an AE viewer resize to 9216x3164 retired and re-created the ring (228 MB slots) and QCView followed. Unload-on-quit unmeasured (the session ended in a GPU driver reset). A deliberate alpha look still owed. A5 notes addendum.
 - [-] **`qcbae-probe`**: `produce` and `dump` should port with the ring;
   `view` is Metal and needs a D3D11 twin, or skip it and use QCView as the
   viewer.

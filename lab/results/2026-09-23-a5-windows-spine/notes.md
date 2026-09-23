@@ -197,9 +197,33 @@ Host behaviours, re-measured rather than inherited (`2026-09-21-a4-transmit-prob
 | --- | --- | --- |
 | pixel format offered 32f → picked | 32f, **ARGB** | 32f, **BGRA** (`PrPixelFormat_BGRA_4444_32f`) — AE hands Premiere's order on Windows; the device already converts both |
 | focus loss | video off unless the background preference is unticked | same: activation event 3 → video 0 → PausedFocus; event 2 → video 1 on return |
-| device unloaded on quit | never | *pending — AE is still up; the log will show `module unload` or not* |
-| bottom-up rows, alpha flattening | measured | *pending: a person at the box confirms the picture is upright and the alpha is flat — the log cannot see pixels* |
+| device unloaded on quit | never | unmeasured: the session ended in a driver reset, not a quit |
+| bottom-up rows, alpha flattening | measured | picture confirmed usable by the operator in both hosts; a deliberate alpha look still owed |
 | per-viewer-change frame count, inTime -1 | 2 frames, -1 | not instrumented in the product device; the probe (`QCBridgeAE-Transmit-Probe.prm`, also built) measures it when installed |
+
+**Premiere Pro 2026 too, and both at once (13:07–13:09, a person at the
+box).** Premiere loaded the same `.prm` from MediaCore (`startup in
+Premiere Pro: ring /qcbae-premiere`), handed 1920x1080 32f **BGRA** (its
+native order, as on the Mac), and QCView on `qcbae://premiere` went LIVE:
+240-frame windows at **63.3 fps** during playback, 31 fps, 5.5 fps while
+scrubbing, ring copy 1.3 ms mean / 7–9 ms max. The two rings coexisted
+and QCView switched between the AE and Premiere items, each re-opening
+its ring on return.
+
+**The replace path ran in anger.** AE's viewer changed to 9216x3164 mid-
+session; the device logged `ring retired (needs more room) after 514
+frames` and `ring /qcbae-ae created, 227808 KiB per slot`, and QCView,
+which was holding the 16 MB ring, saw Retired, closed, re-opened and went
+LIVE at 9216x3164 (row 73728) — the Windows create-while-held sequence
+from the unit test, on real frames, 228 MB a slot. AE playback into QCView
+at 1080p ran at 23.97 fps, which is the comp rate.
+
+Ended by a GPU driver reset at 13:09 with the two hosts, QCView, a Blender
+pair and a screen capture all up — the operator's words. So "the device is
+never unloaded on quit" is unmeasured on Windows: no quit happened. The
+upright-picture and flat-alpha checks: the operator ran both hosts into
+QCView and called them working; the pixel-level alpha check is still owed
+as a deliberate look.
 
 The VC runtime dependency (`MSVCP140`, `VCRUNTIME140`) is a packaging
 note for A7: the Adobe hosts ship it, a clean machine without them may
