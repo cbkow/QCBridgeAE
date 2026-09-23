@@ -281,7 +281,7 @@ its conclusions need a Windows twin before they are safe to build on.
   is out of the transport entirely and `video_listen` is deleted. Nothing for
   Windows to inherit.
 
-## QCBridge — the agent after the quinn port (2026-09-22, branch `spike/quinn`)
+## QCBridge — the agent after the quinn port (2026-09-22, then branch `spike/quinn`, now `main`)
 
 Kyber is gone; the transport is plain `quinn`. The Mac side builds, passes
 10/10 transport contract tests and 87/87 pytest. None of it has been compiled
@@ -312,7 +312,7 @@ on Windows.
   SRT's latency buffer looks like pure overhead. mac↔win with real loss is
   what decides how low that setting can actually go.
 
-## QCBridge — discovery and runtime settings (2026-09-22, branch `spike/quinn`)
+## QCBridge — discovery and runtime settings (2026-09-22, then branch `spike/quinn`, now `main`)
 
 The agent now finds replicas three ways — a unicast probe to `host:4246`
 (the VPN path, primary), a shared-storage phonebook, and multicast on
@@ -366,7 +366,7 @@ so the beacons read as siblings; do not move them.
   `test_set_config_round_trip_and_needs_restart` and
   `test_discover_by_direct_probe_finds_the_replica`.
 
-## QCBridge — the sync after the audit (2026-09-23, branch `spike/quinn`)
+## QCBridge — the sync after the audit (2026-09-23, then branch `spike/quinn`, now `main`)
 
 One day of audit-driven work on the host↔replica sync, all of it proven on
 the Mac only: `SYNC-AUDIT.md`, `COVERAGE.md` and `CACHES.md` in the QCBridge
