@@ -6,7 +6,7 @@
 # and Transmit targets land later and are the only ones that will need one.
 
 cmake_minimum_required(VERSION 3.24)
-project(QCBridgeAE VERSION 0.1.0 LANGUAGES CXX)
+project(QCBridgeAE VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,6 +69,10 @@ if(APPLE AND EXISTS "${_ae_headers}/AE_Effect.h")
         BUNDLE TRUE
         BUNDLE_EXTENSION "plugin"
         OUTPUT_NAME "QCBridgeAE"
+        # The plist templates take the bundle version from these, so
+        # project() is the one version site.
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/src/aegp/Info.plist.in")
     # Without the explicit export, -dead_strip removes the entry point the
     # PiPL names and AE silently fails to bind the plugin.
@@ -124,6 +128,8 @@ if(APPLE AND EXISTS "${_pr_headers}/PrSDKTransmit.h")
             BUNDLE TRUE
             BUNDLE_EXTENSION "bundle"
             OUTPUT_NAME "${output}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/${plist}")
         # The host binds by name; -dead_strip would otherwise take the entry point.
         target_link_options(${target} PRIVATE "-Wl,-exported_symbol,_xTransmitEntry" "-Wl,-dead_strip")

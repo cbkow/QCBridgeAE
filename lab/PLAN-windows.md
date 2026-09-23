@@ -153,10 +153,9 @@ yet, and some of it does not exist on macOS either
   endpoint protection will object otherwise); the pyzmq wheel matrix only
   if zmq still ships.
 
-One thing here is **a decision, not a task**, and it is the macOS owner's:
-the version QCBridge ships as. The agent line is on `main` now; the
-manifest still says 0.1.6, and the bump is a release act. Ask; do not
-guess.
+The versions are decided (2026-09-23): QCView 2.4.0, QCBridgeAE 0.2.0,
+QCBridge 0.2.0 for the extension and the agent alike, and each repo carries
+its number now. Tagging and publishing stay the macOS owner's release act.
 
 Exit: three installers that install on a machine that has never seen a
 compiler or an SDK.
@@ -164,8 +163,9 @@ compiler or an SDK.
 ## Phase 6 — the release gate
 
 All three checklists in `TRACKING-windows.md` ticked with evidence or with
-a written "dropped, because". QCView 2.3.4 is already cut on macOS and is
-waiting for this. The three go out on the same day, from the same set of
+a written "dropped, because". QCView goes out as 2.4.0 (the 2.3.4 DMG cut
+on 2026-09-22 was never published and predates the day's work; it is
+rebuilt at the gate) and is waiting for this. The three go out on the same day, from the same set of
 commits, with release notes that say what a Windows user gets and does not
 get (an update channel, native capture) — honestly.
 

@@ -29,8 +29,9 @@ dropped (with the reason).
 ## The goal: one coordinated release (decided 2026-09-22)
 
 **Nothing ships until all three are built and released together.** QCView
-2.3.4 is cut and ready on macOS but is *waiting for Windows*; the two bridges
-go out with it. So there is no time pressure — the point is that a user never
+goes out as 2.4.0 (rebuilt at the gate; the unpublished 2.3.4 DMG is
+superseded) and is *waiting for Windows*; the two bridges go out with it
+as 0.2.0 each. So there is no time pressure — the point is that a user never
 has a QCView that speaks to a bridge they cannot install, or a bridge built
 against a QCView that has not shipped.
 
@@ -717,10 +718,10 @@ decides when the coordinated release can happen.
   Blender, which needs a desktop. macOS gets a login item. Neither exists.
 - [ ] **Sign the agent.** Unsigned binaries that open listening sockets and
   launch other programs are exactly what endpoint protection objects to.
-- [ ] **Which addon version ships.** Decided 2026-09-23: the agent line is
+- [x] **Which addon version ships.** Decided 2026-09-23: the agent line is
   merged into `main`; the zmq transport stays as the fallback. The manifest
-  still says 0.1.6 — the bump (0.2.0, presumably) is a release act for the
-  macOS owner once Windows passes, not a task here.
+  says 0.2.0, matching the agent's Cargo version; the addon panel now warns
+  when the two differ. Tagging is the macOS owner's release act.
 - [ ] **The pyzmq wheel matrix.** The frozen zmq transport still needs a
   wheel per Python version in `qcbridge/wheels/`. The agent path is
   stdlib-only and needs none — so if the agent becomes the default, most of

@@ -155,8 +155,9 @@ Follow `PLAN-windows.md` Phase 0 and the start of Phase 1. In practice:
 Two things will come up that the Mac owner decides, not the Windows
 session. Ask, do not guess:
 
-- **Which QCBridge version the release carries.** The agent line is on
-  `main` now; the manifest still says 0.1.6. The bump is a release act.
+- **Versions are decided (2026-09-23):** QCView 2.4.0; QCBridgeAE 0.2.0
+  and QCBridge 0.2.0 (extension and agent alike). The numbers are in each
+  repo now; what remains a release act is tagging and publishing.
 - **Signing.** Whether QCView's Windows package, the Transmit bundle and
   the agent are signed, and with what. Keys are not something you will be
   handed in a chat.
