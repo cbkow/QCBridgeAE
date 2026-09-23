@@ -259,6 +259,25 @@ those changes are not macOS-only:
   PDF, the virtual keyboard and a second FFmpeg — the Windows package may
   deserve the same treatment.
 
+## QCView — Alt+Scroll timeline pan (fixed on the Mac 2026-09-23, unverified on Windows)
+
+Reported from Windows: Alt+Scroll pans the timeline on macOS and does
+nothing on Windows. Cause, from the Qt 6.11.1 source: the Windows (and X11)
+platform plugin reports Alt+wheel as a *horizontal* rotation
+(`qwindowspointerhandler.cpp`, `keyModifiers & Qt::AltModifier` →
+`QPoint(delta, 0)`); Cocoa keeps it vertical. Both timeline wheel handlers
+read only `angleDelta.y`, so on Windows the pan delta was always zero.
+`TimelinePanel.qml` now folds x into y for the Alt case only
+(`wheelPanDelta`). The macOS build is green and the Mac path is unchanged.
+
+- [ ] **Alt+Scroll pans on Windows** with a mouse wheel, in the track area
+  and over the overview bar, and in the same direction as macOS (the folded
+  delta keeps Windows' sign; `WM_MOUSEHWHEEL` is the one Qt negates, and
+  Alt+vertical is not that message). If the direction is reversed, say so;
+  do not flip it locally.
+- [ ] **Plain Scroll still zooms** and a trackpad horizontal swipe with no
+  modifier does nothing (the fold is gated on Alt).
+
 ## QCBridge — transport, after the mux-tax bench (2026-09-22)
 
 The Blender sister repo is dropping Kyber for quinn on the control lanes and
