@@ -573,6 +573,20 @@ Blender's preferences.
   and the Send/Receive switch from the window; Open Agent Settings from
   Blender's preferences on this box.
 
+## QCBridge — icons on Windows (added 2026-09-24)
+
+The agent embeds QCView's glyph in mid grey for the tray (a status dot at
+lower-left: green paired, amber waiting, red off) and near white on the
+dark square for the window and the exe (QCBridge commit "icons"). The exe
+icon is a resource compiled by `build.rs` through `embed-resource`, which
+finds `rc.exe` through vswhere.
+
+- [ ] **The exe shows the app icon** in Explorer and on the taskbar, and
+  the settings window's title bar; `build.rs` compiled the resource on
+  this box (no `rc.exe not found` in the build log).
+- [ ] **The tray icon reads on the taskbar** in light and dark Windows
+  themes, and the dot changes when the sender connects and leaves.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
