@@ -581,9 +581,11 @@ dark square for the window and the exe (QCBridge commit "icons"). The exe
 icon is a resource compiled by `build.rs` through `embed-resource`, which
 finds `rc.exe` through vswhere.
 
-- [ ] **The exe shows the app icon** in Explorer and on the taskbar, and
-  the settings window's title bar; `build.rs` compiled the resource on
-  this box (no `rc.exe not found` in the build log).
+- [x] **The exe carries the app icon.** `build.rs` compiled the resource
+  on this box (embed-resource built, no rc.exe complaint), and the icon
+  the shell extracts from the exe samples as our dark square (31,31,31)
+  with the near-white glyph (236,236,236), not the generic exe icon.
+  Explorer, the taskbar and the window's title bar are a look by hand.
 - [ ] **The tray icon reads on the taskbar** in light and dark Windows
   themes, and the dot changes when the sender connects and leaves.
 
