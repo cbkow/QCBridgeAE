@@ -441,39 +441,54 @@ its conclusions need a Windows twin before they are safe to build on.
   on both platforms (a per-Scene resend would be the fix), tracked as a
   QCBridge improvement, not here.
 
-## QCBridge — the replica agent under the logon task dies with a console-control exit (found 2026-09-23, paired run)
+## QCBridge — the replica agent under the logon task dies with a console-control exit (found 2026-09-23, paired run; fixed 2026-09-24)
 
-Twice in the paired session the replica agent registered by
+Twice in the paired session the replica agent registered by the old
 `agent/windows/logon-task.ps1` ended with task result `0xC000013A`
 (`STATUS_CONTROL_C_EXIT`): once after about an hour up (the host saw
 "replica lost"), and then *every* `Start-ScheduledTask` restart died within
 a second with the same code, no crash event in the Application log. The
-same binary started through a one-line batch wrapper
-(`cd` to the release folder, `qcbridge-agent.exe --role replica > log 2>&1`)
-by an equivalent interactive one-shot task ran fine, took the host, launched
-Blender and streamed. Launched directly by the scheduler the process has a
-console of its own with nothing on stdout/stderr; behind `cmd` it has
-redirected handles. That is the only difference found.
+same binary started through a one-line batch wrapper by an equivalent
+interactive one-shot task ran fine. Launched directly by the scheduler the
+process had a console of its own; behind `cmd` it had redirected handles.
 
-- [ ] **The agent's children outlive it, and block its successor.** Found
-  2026-09-24: `Stop-Process` on the replica agent left `blender.exe`,
-  `qcb-capture-win.exe` and `ffmpeg.exe` running with its ports and its log
-  handle; the next agent start exited within a second with nothing logged.
-  Killing the three by hand fixed it. A Windows job object
-  (`CreateJobObject` + kill-on-close) makes the children die with the
-  agent; and the agent should print the bind error instead of exiting
-  silently.
-- [ ] **Find why the direct launch dies.** Reproduce with the task as
-  registered; try `-Argument` with a redirect via `cmd /c`, or build the
-  agent with `#![windows_subsystem = "windows"]` when `tray = true` (no
-  console at all; log to a file beside `agent.toml`). The fix should make the
-  logon task the reliable path; until then the wrapper is.
-- [ ] **A log file for the agent on Windows.** Its stdout is the only
-  diagnostic and the task swallows it. Write `agent.log` next to
-  `agent.toml` (rotating) from the binary, not the launcher.
-- [ ] **The visible console window is a hazard.** Started by the scheduler
-  the agent shows a console on the desktop that a user can close (that ends
-  it with this exact code). Same fix as the first item.
+**Fixed 2026-09-24** (QCBridge agent commit "Windows hygiene"): the release
+binary is a GUI-subsystem executable, so there is no console to close or
+signal; diagnostics go to `agent.log` beside `agent.toml`; the agent sits
+in a job object with kill-on-close; a `Global\` named mutex per role and
+config directory refuses a second instance; children start with
+`CREATE_NO_WINDOW`; a start failure is logged and shown in a message box.
+Autostart is a Run-key value (`agent/windows/autostart.ps1`), which also
+removes the old task. Verified on this box from the Mac seat, the exe
+started *directly* by a one-shot interactive task, no wrapper:
+
+- [x] **The agent's children outlive it, and block its successor.**
+  `Stop-Process -Force` on the agent: 3 s later none of agent, `blender.exe`,
+  `qcb-capture-win.exe`, `ffmpeg.exe` were running (the job took the
+  grandchildren the addon spawned inside Blender too). The next direct
+  launch was up in a second, the host reconnected in one more, Blender
+  relaunched; `agent.log` shows both starts.
+- [x] **Find why the direct launch dies.** It no longer can: PE subsystem 2
+  (GUI), task status *Running* after the launch, zero visible `conhost`
+  windows from the desktop session, the agent's only window the hidden
+  tray one. `--version` from the SSH console still prints (parent-console
+  attach). Two restarts in a row, both clean.
+- [x] **A log file for the agent on Windows.** `%APPDATA%\QCBridge\agent.log`
+  (UTC stamps, one rotated generation at 4 MiB); `blender.log` beside it
+  holds Blender's console output per launch. The capture helper here is
+  spawned by the addon inside Blender, so its output stays in the addon's
+  own log; `capture.log` appears only when the agent runs the helper.
+- [x] **The visible console window is a hazard.** Gone with the subsystem
+  change; Blender, the helper and ffmpeg run with `CREATE_NO_WINDOW` and
+  open no console of their own.
+- [x] **Second instance.** Headless from SSH: refused, exit 1, the line in
+  `agent.log`. With the tray from the desktop: the "QCBridge Agent could
+  not start" box appeared (closed by pid). First build used a `Local\`
+  mutex, which is per logon session — the SSH-started copy was only caught
+  by the pid check; now `Global\`, re-verified from the SSH session.
+- [ ] **Owed by hand:** quit from the tray closes Blender cleanly within the
+  5 s grace before the job kills what is left; the Run-key start at the next
+  logon of this box (the value is registered; the old task is gone).
 
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
@@ -765,9 +780,12 @@ decides when the coordinated release can happen.
   `qcbridge/ring1/transport_agent.py` already looks in `qcbridge/bin/` first,
   before the cargo build dirs — that is the shipping path and nothing puts a
   binary there yet. One per platform.
-- [~] **Autostart the agent at login.** The design calls for a Windows logon
-  task **in the interactive user session, not a service** — it launches
-  Blender, which needs a desktop. macOS gets a login item. Neither exists.
+- [~] **Autostart the agent at login.** The design calls for a Windows
+  autostart **in the interactive user session, not a service** — it launches
+  Blender, which needs a desktop. macOS gets a login item.
+  *2026-09-24:* Windows is a Run-key value now (`agent/windows/autostart.ps1`,
+  registered on this box, old task removed); the macOS login item is still
+  open.
   *Windows 2026-09-23:* the logon task exists (`agent/windows/logon-task.ps1`) and is **registered and running on this box** as a replica with the tray (interactive session, limited rights) — pointing at the cargo build for now, `qcbridge/bin` when the extension bundles it. The Blender 5.2 extension folder here was a stale August copy of the zmq-only 0.1.6 (no agent line; today's tests imported the repo directly and never touched it); it is now a directory junction to the working tree, and Blender enables it and finds the agent and the capture helper. The macOS login item is still the Mac's.
 - [ ] **Sign the agent.** Unsigned binaries that open listening sockets and
   launch other programs are exactly what endpoint protection objects to.

@@ -115,7 +115,8 @@ cache root, path mapping, linked libraries, the local-edit detector).
    these.
 4. The Windows-only gaps that are real work, not verification:
    `pid_alive` (single-instance guard), the firewall rule for UDP/4246, the
-   logon task that autostarts the agent in the interactive session.
+   Run-key autostart of the agent in the interactive session (done
+   2026-09-24, with the console, log-file and job-object hygiene).
 
 Exit: every QCBridge item in the tracker ticked with evidence, or written
 down as "differs on Windows, here is how".
@@ -149,7 +150,7 @@ yet, and some of it does not exist on macOS either
 - **QCBridgeAE A7**: sign the Transmit bundle, build an installer, confirm
   the MediaCore path and whether it needs admin. Shared work with the Mac.
 - **QCBridge**: bundle the agent binary in `qcbridge/bin/` per platform;
-  the logon task; sign the agent (it opens sockets and launches Blender —
+  the Run-key autostart (done); sign the agent (it opens sockets and launches Blender —
   endpoint protection will object otherwise); the pyzmq wheel matrix only
   if zmq still ships.
 

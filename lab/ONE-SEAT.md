@@ -37,10 +37,14 @@ side.
   - `build-qcview.cmd` rebuilds `build-release` with the MSVC environment;
     run it through a task (`qcb-lab-build`). The viewer must be closed
     first or the link fails on the open `qcview.exe`.
-- **The replica agent** is a logon task ("QCBridge Agent"); `Start-ScheduledTask`
-  from SSH restarts it after a config change. Its beacon on UDP/4246
-  answers a direct probe from the Mac (`{"t":"q"}`), which is the quickest
-  "is it up, is it paired" check.
+- **The replica agent** autostarts from the user's Run key
+  (`agent/windows/autostart.ps1`, since 2026-09-24; it was a logon task,
+  and the task-launched agent died with a console-control exit). To
+  restart it after a config change: `Stop-Process` it from SSH, which
+  takes its Blender, helper and ffmpeg with it (job object), then start
+  the exe directly through `run.ps1`. Its beacon on UDP/4246 answers a
+  direct probe from the Mac (`{"t":"q"}`), which is the quickest "is it
+  up, is it paired" check; `agent.log` beside `agent.toml` is the rest.
 - **`qcb-lab` share** on the Windows box (`C:\qcb-lab\share`) for the
   shared-root tests when no studio share is reachable from both networks.
 

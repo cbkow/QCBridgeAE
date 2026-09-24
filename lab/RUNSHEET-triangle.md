@@ -34,7 +34,7 @@ material in what you write down.*
    Check the panel shows 0.2.0.
 2. **The agent.** `cargo build --release` in `agent/` on each box (the Mac
    has done this; `qcbridge-agent --version` prints 0.2.0). Each box runs
-   its own role: Windows starts as **replica** (`agent/windows/logon-task.ps1`
+   its own role: Windows starts as **replica** (`agent/windows/autostart.ps1`
    or by hand with `--role replica`), the Mac as **host**. The firewall rule
    (`agent/windows/firewall-rule.ps1`, elevated) must be in before the Mac
    can probe UDP/4246 on Windows.

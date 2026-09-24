@@ -129,9 +129,9 @@ Follow `PLAN-windows.md` Phase 0 and the start of Phase 1. In practice:
 - **Real Windows work, not verification**: `pid_alive` returns `None` on
   Windows so the single-instance guard cannot refuse a second agent
   (`OpenProcess` + `WaitForSingleObject`); a firewall rule for UDP/4246
-  (MinRender's installer shows the pattern); the logon task that
+  (MinRender's installer shows the pattern); the Run-key value that
   autostarts the agent in the interactive session (not a service — it
-  launches Blender).
+  launches Blender; it was a logon task until 2026-09-24).
 - **Blender behaviours the code relies on, probed on the Mac, to
   re-confirm here**: `use_disk_cache` is ignored on an unsaved file; an
   unbaked external cache on the replica writes into the shared directory
