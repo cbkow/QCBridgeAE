@@ -515,6 +515,23 @@ and read back with `CredReadW`. `agent.toml` holds `token = ""` and
 - [ ] **Owed by hand:** set a token from the panel's lock icon on the
   Windows replica and see the fingerprint change in its tray line.
 
+## QCBridge — the replica localizes with the host's mapping rows (added and ticked 2026-09-24)
+
+Since QCBridge commit "the path-mapping table and the cache root live in
+the agent", the host's rows travel in the hello and the replica merges them
+after its own. The mapping row no longer has to be entered on the Windows
+box.
+
+- [x] **A Windows replica with no row of its own localizes the Mac host's
+  share paths.** Its Blender preferences were emptied (three rows → none)
+  and its agent holds none; the shared-root scene from the 23rd gave
+  `unmapped 1` (the deliberate stray only), `frozen 0`, `errors 0` — the
+  same numbers as with the row entered here, where an absent row gave
+  `unmapped 4` on the 23rd. The Mac host's addon pushed its rows and cache
+  root into the Mac agent on that first session (logged).
+- [ ] **Owed by hand:** the preferences panel on this box shows the agent's
+  table while a session runs, and Save to Agent sends an edit back.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
