@@ -550,6 +550,25 @@ socket the settings window uses):
 - [ ] **Owed by hand:** the switch from the settings window once it ships,
   and a `listen` change while paired.
 
+## QCBridge — the settings window on Windows (added and ticked 2026-09-24)
+
+`qcbridge-agent --settings` (QCBridge commit "the settings window") is a
+second process of the same exe, eframe on glow, attached to the running
+agent as a control client. Opened from the tray's Settings… item and from
+Blender's preferences.
+
+- [x] **Opens on the Windows desktop and shows the agent's state.** Run
+  through the one-shot task with `--shot`, the window rendered every
+  section from the replica agent's live view — name, Receive scene
+  selected, the Blender path, kiosk, idle, the token fingerprint, the
+  listen address and this machine's certificate, the network mode, the
+  phonebook folder, the (empty) mapping table, the stream cap and scale,
+  the config and log paths — and exited on its own.
+- [ ] **Owed by hand:** a folder picker on a mapped drive proposes the
+  macOS form of the same folder (the mount table through
+  `WNetGetConnectionW`); Set token and the Send/Receive switch from the
+  window; Open Agent Settings from Blender's preferences on this box.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
