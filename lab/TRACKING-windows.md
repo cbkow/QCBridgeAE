@@ -429,6 +429,43 @@ its conclusions need a Windows twin before they are safe to build on.
   is out of the transport entirely and `video_listen` is deleted. Nothing for
   Windows to inherit.
 
+## QCBridge — the bootstrap count the Windows survey flagged (answered 2026-09-23)
+
+- [-] **"8 bootstraps on Windows against 1 on the Mac."** Not a difference:
+  the 1 is the Mac's first survey table, before the day's fixes; the Mac's
+  final run (`spikes/parity/results/2026-09-23-sync-coverage/full-agent-final.json`)
+  has the same replica stats as Windows, 8 bootstraps included. Seven are
+  `Scene`-level structural changes escalating to a tier-2 that `Scene`
+  cannot express as a blob, so the host resends a bootstrap — a cost item
+  on both platforms (a per-Scene resend would be the fix), tracked as a
+  QCBridge improvement, not here.
+
+## QCBridge — the replica agent under the logon task dies with a console-control exit (found 2026-09-23, paired run)
+
+Twice in the paired session the replica agent registered by
+`agent/windows/logon-task.ps1` ended with task result `0xC000013A`
+(`STATUS_CONTROL_C_EXIT`): once after about an hour up (the host saw
+"replica lost"), and then *every* `Start-ScheduledTask` restart died within
+a second with the same code, no crash event in the Application log. The
+same binary started through a one-line batch wrapper
+(`cd` to the release folder, `qcbridge-agent.exe --role replica > log 2>&1`)
+by an equivalent interactive one-shot task ran fine, took the host, launched
+Blender and streamed. Launched directly by the scheduler the process has a
+console of its own with nothing on stdout/stderr; behind `cmd` it has
+redirected handles. That is the only difference found.
+
+- [ ] **Find why the direct launch dies.** Reproduce with the task as
+  registered; try `-Argument` with a redirect via `cmd /c`, or build the
+  agent with `#![windows_subsystem = "windows"]` when `tray = true` (no
+  console at all; log to a file beside `agent.toml`). The fix should make the
+  logon task the reliable path; until then the wrapper is.
+- [ ] **A log file for the agent on Windows.** Its stdout is the only
+  diagnostic and the task swallows it. Write `agent.log` next to
+  `agent.toml` (rotating) from the binary, not the launcher.
+- [ ] **The visible console window is a hazard.** Started by the scheduler
+  the agent shows a console on the desktop that a user can close (that ends
+  it with this exact code). Same fix as the first item.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
@@ -512,6 +549,7 @@ so the beacons read as siblings; do not move them.
   UDP/4246 until a rule exists** — MinRender's installer adds one for its
   own port (`installer/minrender_installer.iss`); the agent needs the same.
   *Windows 2026-09-23:* binds `0.0.0.0:4246` and answers direct probes on one box (pytest discovery test, and a tray run). Coexistence with UFB/MinRender and a probe from another box: two-machine. Firewall rule: `agent/windows/firewall-rule.ps1` (`c1f1e56`), needs an installer/elevation to apply.
+  *Paired 2026-09-23, from the Mac seat:* a direct probe from the Mac **over the VPN** answered with the replica beacon (role, port, version, fingerprint, `paired`), and the host agent's QUIC attach to 19990 followed once the tokens matched — no firewall rule was needed for either, the agent process having been allowed when it bound. That is the direct-address item done; multicast stays unexercised (different networks).
 - [ ] **Only replicas answer on 4246 — by design, keep it that way.** Two
   sockets sharing the port with reuse both get multicast but a unicast
   probe reaches only one; a host on the port silently ate probes meant for
@@ -597,7 +635,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   (123 actions, 120 of 122 surveyed cross on the Mac; its `t2`/`t1` columns are the blob
   and delta cost per action — read them, not just the status).
   *Windows 2026-09-23:* ported to CPython (`smokes/run_smokes.py`): 21/21, reconnect 6/6, cache 5/5, mapping 4/5 (the 5th is not expressible on a same-OS pair — notes), bench both transports, coverage survey 120 crossed / 2 not / 2 piggybacked — the Mac's rows exactly, median 249 ms; replica counted 8 bootstraps vs the Mac's 1 (Scene-level actions escalate to an unsupported Scene blob → auto bootstrap; cost, not correctness — flagged). The survey host's `os.replace` of its JSON hit a Windows rename-over-open-file error once; retried now (`smokes/_atomic.py`, `3a38b52`). QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
-- [~] **The shared cache root on Windows paths.** `cache_root` (addon
+- [x] **The shared cache root on Windows paths.** `cache_root` (addon
   preference, `subtype='DIR_PATH'`) is joined with `os.path.join` and
   `os.makedirs`; the host writes `<root>/<file>/<uuid>/<sim>` and Blender
   writes `.bphys` frames there. Confirm a UNC path and a mapped drive both
@@ -606,6 +644,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   (`any(f.endswith('.bphys') …)`) sees files the host just wrote on the SMB
   share without a delay that makes it keep the cache in memory.
   *Windows 2026-09-23:* the cache smoke passes on a local root (5/5). UNC and mapped-drive roots, and the SMB timing: two-machine / the studio share.
+  *Paired 2026-09-23, driven from the Mac seat (`ONE-SEAT.md`):* a Mac host's cloth cache externalized into a root on the studio SMB share and baked (24 `.bphys`); the Windows replica read it through the mapping row as a UNC root and again as a mapped drive — `frozen 0`, `errors 0`, no resync. SMB timing showed no stall on a 12×12 grid; a heavier sim is still worth a look. `spikes/parity/results/2026-09-23-triangle/`.
 - [x] **The two cache hazards are Blender behaviour — confirm they hold on
   Windows.** (7) An unbaked external cache on the replica writes into the
   shared directory and poisons the host's bake; (8) re-setting
@@ -618,7 +657,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   2026-09-18; the host now refuses to externalize with a panel note). Verify
   the same on Windows so the note is not a false alarm there.
   *Windows 2026-09-23:* holds: reads back `False`, bake writes 0 files.
-- [ ] **Path mapping from a mac host — the real cross-OS case.** A bootstrap
+- [x] **Path mapping from a mac host — the real cross-OS case.** A bootstrap
   carries the host's native paths; a Windows replica must translate
   `/Volumes/…` absolute paths through the table (`pathmap.localize_any`,
   unit-tested only) and count what it cannot resolve by *existence*
@@ -627,6 +666,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   host with an absolute texture path under the mapped root and one outside
   it: the first must load, the second must show as "1 unmapped" on both
   panels.
+  *Paired 2026-09-23, driven from the Mac seat (`ONE-SEAT.md`):* exactly that, over the VPN: absolute image under the root loaded, the stray outside every mapping counted `unmapped 1` on the host panel. The finding on the way there: the row must be on **both** machines (the replica localizes with its own table); with it missing on the replica the count was 4 and Blender read `/Volumes/…` as `C:\Volumes\…`. User doc updated. `spikes/parity/results/2026-09-23-triangle/`.
 - [x] **The reconnect smoke's expectations.** After the replica is killed and
   restarted, the host re-handshakes within ~1.5 s (QUIC idle timeout 3 s,
   keepalive 500 ms) and re-bootstraps; a dropped tier-1 frame is detected
@@ -659,7 +699,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   `QCB_COV_UNDO=1 QCB_COV_ONLY=obj_color,mesh_vertex_move,undo_after_move`
   and read the `t2` column for the undo row.
   *Windows 2026-09-23:* the gate skips on Windows — 27 of 102 tier-2 sends in the full survey were `unchanged blob`, so the writes are deterministic enough. The undo row itself could not be measured: `bpy.ops.ed.undo()` from the survey's timer crashes Blender 5.2.0 here (access violation in `deg_update_eval_copy_datablock`; the Mac's GUI only rewinds). Hand check: Ctrl-Z in a `QCB_DEBUG=1` host and count the skips. Flagged to the Mac side as a Blender-on-Windows difference. QCBridge `spikes/parity/results/2026-09-23-windows-agent/`.
-- [ ] **Linked libraries cross by path.** A `link` message names the
+- [x] **Linked libraries cross by path.** A `link` message names the
   library file in the host's native form and the linked object/collection
   names; the replica maps the path (`pathmap.localize_any`), links the
   names, and counts a file it cannot find as unmapped. Two machines: link
@@ -668,6 +708,7 @@ is `#[cfg(unix)]`-gated, so the risk is behavioural, not build.
   and confirm "1 unmapped" on both panels. A library the replica had to
   repoint is `reload()`ed — watch for a Windows-specific stall there on a
   large library.
+  *Paired 2026-09-23, driven from the Mac seat (`ONE-SEAT.md`):* a collection linked from a `lib.blend` under the mapped root appeared on the Windows replica through the UNC row and through the drive-letter row, `last_error` empty, no stall on a one-object library. The outside-every-mapping case was covered by the stray image in the same run. `spikes/parity/results/2026-09-23-triangle/`.
 - [ ] **The replica's local-edit detector** is a `depsgraph_update_post`
   handler with time-based attribution (1.5 s touch grace, 3 s after a blob,
   0.5 s after a frame change). It has no platform code, but its false
