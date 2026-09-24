@@ -276,8 +276,9 @@ sides have no clock (`dualSeekable` false) and the transport hides.
   what wakes it — if the live side only repaints when you move the mouse,
   that callback is not reaching the renderer.
   *Windows 2026-09-23:* single-view `srt://` from a Windows Blender replica works: `LiveStreamDecoder: LIVE (d3d11va zero-copy, 3840x2160)`, 10-bit, through the native helper. Dual with a file on the other side: done (the item above); the file side drives the transport, the live side updates through the CPU path.
-- [~] **Live + live**: transport and timeline hidden, both sides updating.
+- [x] **Live + live**: transport and timeline hidden, both sides updating.
 
+  *Paired 2026-09-24, from the Mac seat:* the triangle on the Windows box — the Windows replica's 4K 10-bit `srt://` (host on the Mac over the VPN) on A, AE 2026's Transmit ring on B, `--dual-test … --sbs`: both LIVE at once, A d3d11va zero-copy, B `HostBridgeSource` ~23.7 fps with a ~1 ms ring copy, AE previewing throughout. Wipe and difference on the live pair, and the pixel look at B's alpha, still by hand. `lab/results/2026-09-23-triangle/`.
 ## QCView — Alt+Scroll timeline pan (fixed on the Mac 2026-09-23, unverified on Windows)
 
 Reported from Windows: Alt+Scroll pans the timeline on macOS and does
