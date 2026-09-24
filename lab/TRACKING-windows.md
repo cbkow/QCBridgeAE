@@ -454,6 +454,14 @@ Blender and streamed. Launched directly by the scheduler the process has a
 console of its own with nothing on stdout/stderr; behind `cmd` it has
 redirected handles. That is the only difference found.
 
+- [ ] **The agent's children outlive it, and block its successor.** Found
+  2026-09-24: `Stop-Process` on the replica agent left `blender.exe`,
+  `qcb-capture-win.exe` and `ffmpeg.exe` running with its ports and its log
+  handle; the next agent start exited within a second with nothing logged.
+  Killing the three by hand fixed it. A Windows job object
+  (`CreateJobObject` + kill-on-close) makes the children die with the
+  agent; and the agent should print the bind error instead of exiting
+  silently.
 - [ ] **Find why the direct launch dies.** Reproduce with the task as
   registered; try `-Argument` with a redirect via `cmd /c`, or build the
   agent with `#![windows_subsystem = "windows"]` when `tray = true` (no
