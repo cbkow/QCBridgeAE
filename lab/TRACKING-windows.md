@@ -532,6 +532,24 @@ box.
 - [ ] **Owed by hand:** the preferences panel on this box shows the agent's
   table while a session runs, and Save to Agent sends an edit back.
 
+## QCBridge — the Send/Receive switch is live on Windows (added and ticked 2026-09-24)
+
+`role` and `listen` are live fields since QCBridge commit "the Send/Receive
+switch is live": the agent rebuilds its role runtime in place (listener,
+accept loop, Blender lifecycle or dial loop, beacon, `agent.json` entry).
+Driven from a control client on this box (`C:\qcb-lab\ctl.py`, the same
+socket the settings window uses):
+
+- [x] **Replica → host → replica, live.** As host it dialled the Mac (turned
+  replica the same way), pinned its certificate and paired within a second;
+  back as replica it listened again and the Mac host re-paired five seconds
+  later, Blender relaunched. No console, no second instance, `agent.toml`
+  ended as it began. The Credential Manager token served both roles (the
+  store is per role and directory; the replica entry was reused because
+  the role switch reads the config's token, which was already loaded).
+- [ ] **Owed by hand:** the switch from the settings window once it ships,
+  and a `listen` change while paired.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
