@@ -490,6 +490,31 @@ started *directly* by a one-shot interactive task, no wrapper:
   5 s grace before the job kills what is left; the Run-key start at the next
   logon of this box (the value is registered; the old task is gone).
 
+## QCBridge — the token in Credential Manager (added and ticked 2026-09-24)
+
+The agent keeps the session token in the OS credential store since
+2026-09-24 (QCBridge commit "the token stays in the agent"); on Windows
+that is a generic Credential Manager entry, target
+`QCBridge Agent/<role> @ <config dir>`, written with `CredWriteW`
+(`CRED_PERSIST_LOCAL_MACHINE`, UTF-8 blob, the same shape as UFB's entries)
+and read back with `CredReadW`. `agent.toml` holds `token = ""` and
+`token_store = "keychain"`.
+
+- [x] **A token in `agent.toml` migrates on first start.** The replica
+  here had one; the first start on the new build logged *token: moved from
+  …\agent.toml into the keychain*, the TOML lost it, and `cmdkey /list`
+  from the desktop session shows the entry (the SSH session's `cmdkey`
+  sees none of the user's entries at all — Credential Manager is viewed
+  per logon session, so look from the desktop through `run.ps1`).
+- [x] **The token comes back from the store.** Hard kill and direct
+  relaunch: no migration line, *host connected* one second later — the
+  QUIC token check passed with a token the agent read from Credential
+  Manager. Then the Mac host was restarted on the same build (its token
+  in the macOS Keychain) and paired again, so both ends pair from their
+  stores alone.
+- [ ] **Owed by hand:** set a token from the panel's lock icon on the
+  Windows replica and see the fingerprint change in its tray line.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
