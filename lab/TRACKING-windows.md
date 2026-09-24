@@ -561,13 +561,14 @@ so the beacons read as siblings; do not move them.
   name with spaces or Unicode survives into the phonebook filename
   (`entry_name` replaces anything non-alphanumeric with `_`).
   *Windows 2026-09-23:* `COMPUTERNAME` is set in the interactive session here; the spaces/Unicode-in-phonebook case not exercised.
-- [ ] **The phonebook on a share.** `phonebook = "<dir>"` writes
+- [x] **The phonebook on a share.** `phonebook = "<dir>"` writes
   `<dir>/qcbridge/<name>.json` by temp-file-then-rename. Check that rename
   is atomic enough on the SMB path the studio uses (it is what MinRender
   relies on already), that a UNC path and a mapped drive both work, and
   that a stale entry from a machine that crashed is dropped after 60 s
   rather than offered.
   *Windows 2026-09-23:* not exercised (two-machine / the studio share). One thing learned on this box applies: a rename over a file another process holds open fails on Windows (`PermissionError`) where macOS always succeeds — the coverage survey's own JSON dump hit it. The phonebook writer should retry the rename briefly; the agent's reader is open-read-close, so the window is small but real.
+  *Paired 2026-09-24, from the Mac seat:* done on the studio share — the Windows replica writing over a UNC path (a TOML literal string; double-quoted backslashes are eaten), the Mac host scanning its `/Volumes` path. Host `discover` over the VPN came back `sources ["phonebook"]` with the replica; a host started with no peer paired from the pick alone (`set_config`, connected in 8 s, peer and fingerprint persisted); a replica killed without a goodbye was dropped by age 74 s later. No write failure in an hour of 10 s refreshes with the Mac reading the same file. `spikes/parity/results/2026-09-23-triangle/`.
 - [x] **`pid_alive` returns `None` on Windows**, so the single-instance guard
   cannot refuse a second agent there: it needs `OpenProcess(SYNCHRONIZE)` +
   `WaitForSingleObject(h, 0)` via `windows-sys`. Same answer as the
