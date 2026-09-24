@@ -564,10 +564,14 @@ Blender's preferences.
   listen address and this machine's certificate, the network mode, the
   phonebook folder, the (empty) mapping table, the stream cap and scale,
   the config and log paths — and exited on its own.
-- [ ] **Owed by hand:** a folder picker on a mapped drive proposes the
-  macOS form of the same folder (the mount table through
-  `WNetGetConnectionW`); Set token and the Send/Receive switch from the
-  window; Open Agent Settings from Blender's preferences on this box.
+- [x] **The shared folder named on this box reaches the Mac at pairing.**
+  Each agent was given its own spelling of the shared test folder and an
+  empty table; a host session then paired and both agents held the same
+  mapping row, the Windows spelling from here and the macOS spelling from
+  the Mac (QCBridge notes, "the shared folder named on each side").
+- [ ] **Owed by hand:** the Browse… picker on the shared folder; Set token
+  and the Send/Receive switch from the window; Open Agent Settings from
+  Blender's preferences on this box.
 
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
