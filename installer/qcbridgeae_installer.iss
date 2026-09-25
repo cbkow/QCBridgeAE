@@ -73,13 +73,13 @@ begin
   Result := True;
   if not DirExists(ExpandConstant('{commonpf}\Adobe\Common\Plug-ins\7.0\MediaCore')) then
   begin
-    MsgBox('Adobe''s MediaCore plug-in folder was not found (Program Files\Adobe\Common\Plug-ins\7.0\MediaCore). Install After Effects or Premiere Pro first.', mbError, MB_OK);
+    SuppressibleMsgBox('Adobe''s MediaCore plug-in folder was not found (Program Files\Adobe\Common\Plug-ins\7.0\MediaCore). Install After Effects or Premiere Pro first.', mbError, MB_OK, IDOK);
     Result := False;
     exit;
   end;
   if HostRunning('AfterFX.exe') or HostRunning('Adobe Premiere Pro.exe') then
   begin
-    MsgBox('Quit After Effects and Premiere Pro first: they hold the device file open while they run. Then run this installer again.', mbError, MB_OK);
+    SuppressibleMsgBox('Quit After Effects and Premiere Pro first: they hold the device file open while they run. Then run this installer again.', mbError, MB_OK, IDOK);
     Log('refused: an Adobe host is running');
     Result := False;
   end;
@@ -88,5 +88,5 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
-    MsgBox('Installed. In After Effects: Settings > Video Preview - tick Enable Mercury Transmit and QCBridgeAE > QCView, and untick "Disable video output when in the background". In Premiere Pro the same ticks are under Settings > Playback. Then in QCView: File > Connect to After Effects (or Premiere Pro).', mbInformation, MB_OK);
+    SuppressibleMsgBox('Installed. In After Effects: Settings > Video Preview - tick Enable Mercury Transmit and QCBridgeAE > QCView, and untick "Disable video output when in the background". In Premiere Pro the same ticks are under Settings > Playback. Then in QCView: File > Connect to After Effects (or Premiere Pro).', mbInformation, MB_OK, IDOK);
 end;
