@@ -36,3 +36,4 @@ install_manifest.txt
 *.dSYM/
 *.pdb
 *.ilk
+dist/

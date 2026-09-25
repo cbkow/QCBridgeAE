@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- productbuild Distribution for the QCBridgeAE installer. @VERSION@ is
+     substituted by build-pkg.sh from the built bundle. Payload lands in
+     /Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/QCBridgeAE. -->
+<installer-gui-script minSpecVersion="2">
+    <title>QCBridgeAE @VERSION@</title>
+    <organization>ski.bialkow</organization>
+    <domains enable_localSystem="true"/>
+    <options customize="never" require-scripts="true" rootVolumeOnly="true" hostArchitectures="arm64"/>
+    <allowed-os-versions>
+        <os-version min="13.0"/>
+    </allowed-os-versions>
+    <welcome file="welcome.txt" mime-type="text/plain"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="ski.bialkow.qcbridgeae"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="ski.bialkow.qcbridgeae" visible="false">
+        <pkg-ref id="ski.bialkow.qcbridgeae"/>
+    </choice>
+    <pkg-ref id="ski.bialkow.qcbridgeae" version="@VERSION@" onConclusion="none">QCBridgeAE-core.pkg</pkg-ref>
+</installer-gui-script>

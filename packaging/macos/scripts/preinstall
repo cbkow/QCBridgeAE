@@ -1,0 +1,7 @@
+#!/bin/bash
+# QCBridgeAE installer — preinstall (root). Replace, don't merge: the old
+# bundle goes so the pkg is the only source of what is in MediaCore.
+# After Effects and Premiere must be restarted to load the new device;
+# they are not closed here.
+rm -rf "/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/QCBridgeAE/QCBridgeAE-Transmit.bundle"
+exit 0

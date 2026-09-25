@@ -1,0 +1,5 @@
+QCBridgeAE adds a "QCBridgeAE → QCView" video preview device to After Effects and Premiere Pro. It installs into Adobe's shared MediaCore plug-in folder, so both hosts see it.
+
+Quit After Effects and Premiere Pro before installing; they load devices at launch.
+
+Afterwards, in After Effects: Settings → Video Preview — tick Enable Mercury Transmit, tick QCBridgeAE → QCView, and untick "Disable video output when in the background". Leave "Video preview during render queue output" unticked unless you want renders sent too. In Premiere Pro the same ticks live under Settings → Playback. Then in QCView: File → Connect to After Effects (or Premiere Pro).
