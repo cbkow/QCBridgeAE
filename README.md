@@ -30,22 +30,30 @@ installers are next — see the phase table in `PLAN.md`.
 
 ## Setup (macOS)
 
-**1. Install the device.** Build `qcbae-transmit` (below) and copy
-`build/QCBridgeAE-Transmit.bundle` into
+**1. Install the device.** Quit After Effects and Premiere Pro, then run
+`QCBridgeAE-<version>-arm64.pkg` (signed and notarized). It puts
+`QCBridgeAE-Transmit.bundle` into
 
 ```
 /Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/QCBridgeAE/
 ```
 
-That folder is writable without admin rights, and both After Effects and
-Premiere Pro load Transmit devices from it. Restart the host after
-installing.
+which both After Effects and Premiere Pro load Transmit devices from. On
+Windows, `QCBridgeAE-<version>-Setup-x64.exe` (Inno Setup, unsigned —
+Windows warns once) does the same into `Program Files\Adobe\Common\Plug-ins\7.0\MediaCore`,
+and refuses while a host is running. From a checkout: build
+`qcbae-transmit` (below) and `packaging/macos/build-pkg.sh` /
+`installer/qcbridgeae_installer.iss` make the installers, or copy the
+bundle by hand.
 
 **2. Enable it in After Effects:** *Settings → Video Preview*
 - tick **Enable Mercury Transmit**, then tick **QCBridgeAE → QCView**;
 - **untick "Disable video output when in the background"**. With it ticked
   (the default), After Effects stops sending the moment you click into
-  QCView — QCView shows *PAUSED* and names this setting.
+  QCView — QCView shows *PAUSED* and names this setting;
+- leave **"Video preview during render queue output"** unticked unless you
+  want renders sent to QCView too. That switch is After Effects', not the
+  device's: the SDK gives a device no way to tell a render from a preview.
 
 **3. Enable it in Premiere Pro:** *Settings → Playback* — the same two ticks,
 and the same background setting to untick.

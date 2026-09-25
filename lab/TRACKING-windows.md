@@ -589,6 +589,27 @@ finds `rc.exe` through vswhere.
 - [ ] **The tray icon reads on the taskbar** in light and dark Windows
   themes, and the dot changes when the sender connects and leaves.
 
+## Installers on Windows (added 2026-09-24)
+
+Decided 2026-09-24: Inno Setup, unsigned, for the QCBridge agent and for
+the QCBridgeAE device (an unsigned MSIX cannot be sideloaded, and an MSIX
+cannot write into MediaCore). QCView keeps its Store MSIX flow. Both
+scripts build on this box with `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`.
+
+- [x] **`QCBridge-Agent-0.2.0-Setup-x64.exe`** (`agent/windows/installer.iss`):
+  a silent install put the agent, the capture helper and the notices in
+  `Program Files\QCBridge`, made the Start-menu entries and the uninstall
+  entry (0.2.0), the exe answered `--version` from there, and a silent
+  uninstall removed it all. Start-menu launch and the SmartScreen prompt
+  are a look by hand.
+- [~] **`QCBridgeAE-0.2.0-Setup-x64.exe`** (`installer/qcbridgeae_installer.iss`):
+  built; with After Effects open on this box it refused as designed (exit
+  1, *refused: an Adobe host is running* in the log). **The install itself
+  is owed once AE and Premiere are closed here** — it replaces the device
+  file in MediaCore and registers an uninstall entry under ProgramData.
+- [ ] **A clean machine** that has never seen the SDK, Qt or a compiler:
+  the two installers and the QCView package, in that order.
+
 ## QCBridge — the ffmpeg capture path on Windows (added 2026-09-23)
 
 Native capture (S7) is out of scope for this release *because the ffmpeg
