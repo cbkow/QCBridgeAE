@@ -29,6 +29,7 @@ DisableDirPage=yes
 DisableProgramGroupPage=yes
 CreateAppDir=no
 OutputDir=..\dist
+LicenseFile=..\LICENSE
 OutputBaseFilename=QCBridgeAE-{#MyAppVersion}-Setup-x64
 Compression=lzma2/max
 SolidCompression=yes

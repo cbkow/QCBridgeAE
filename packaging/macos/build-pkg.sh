@@ -38,6 +38,7 @@ echo "[pkg] bundle signed with: $identity"
 cp "$SRC/scripts/preinstall" "$STAGE/scripts/preinstall"
 chmod 755 "$STAGE/scripts/preinstall"
 cp "$SRC/welcome.txt" "$STAGE/resources/welcome.txt"
+cp "$REPO/LICENSE" "$STAGE/resources/LICENSE"
 pkgbuild --analyze --root "$STAGE/root" "$STAGE/components.plist" >/dev/null
 i=0
 while /usr/libexec/PlistBuddy -c "Print :$i" "$STAGE/components.plist" >/dev/null 2>&1; do

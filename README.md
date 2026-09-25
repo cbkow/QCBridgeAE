@@ -103,3 +103,9 @@ Neither is included — they're Adobe Confidential. Put your own copies in
 `lab/` holds findings and measurements, and is the channel between the macOS and
 Windows machines. It is public: read [`lab/README.md`](lab/README.md) before
 writing there.
+
+---
+
+Licensed GPL-3.0-or-later ([LICENSE](LICENSE)), like QCBridge. The Adobe After
+Effects and Premiere Pro SDKs it builds against are Adobe's, are not included,
+and are not covered by that licence.
