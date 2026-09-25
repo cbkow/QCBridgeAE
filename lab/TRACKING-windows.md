@@ -544,6 +544,22 @@ box.
   Blender's role field; then back. The installed agent is started by
   Start Session when none is registered (Task Manager: one agent).
 
+## QCBridge — Blender on the replica follows the host's session (added 2026-09-25)
+
+Since QCBridge commit "Blender on the replica follows the host's session":
+the replica agent launches Blender when the host's Blender attaches to its
+agent (Start Session), not when the agents pair, and closes it after the
+*Close Blender after* grace (default 20 s) once the session ends — Stop
+Session, the host's Blender quitting, a goodbye, or the link dropping.
+
+- [ ] **Owed on this box:** with both agents paired and no session, no
+  Blender runs here and the agent's status reads "host connected, no
+  session". Start Session on the Mac → Blender launches here in kiosk;
+  Stop Session on the Mac → this Blender leaves kiosk within a second and
+  closes after the grace; quit Blender on the Mac → same; pull the Mac's
+  network cable (or stop its agent) → same, "host gone". Start Session
+  again inside the grace → the warm Blender is reused, no relaunch.
+
 ## QCBridge — the Send/Receive switch is live on Windows (added and ticked 2026-09-24)
 
 `role` and `listen` are live fields since QCBridge commit "the Send/Receive
