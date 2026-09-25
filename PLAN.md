@@ -400,9 +400,8 @@ lot, which is why it is separate:
 Everything through A6 builds on macOS with what is in `private/sdk/`. A3 needs
 QCView-Player checked out alongside.
 
-**`PLAN-A3.md`** is the A3 plan (rewritten and approved 2026-09-21, after the
-first one was lost uncommitted with the original machine). Plans get
-committed.
+The A3 plan (rewritten and approved 2026-09-21) was working material and is
+kept out of the tree; its outcome is the QCView ingest described above.
 
 ## Privacy and licensing
 
