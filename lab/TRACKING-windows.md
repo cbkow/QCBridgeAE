@@ -529,8 +529,20 @@ box.
   same numbers as with the row entered here, where an absent row gave
   `unmapped 4` on the 23rd. The Mac host's addon pushed its rows and cache
   root into the Mac agent on that first session (logged).
-- [ ] **Owed by hand:** the preferences panel on this box shows the agent's
-  table while a session runs, and Save to Agent sends an edit back.
+- [x] ~~**Owed by hand:** the preferences panel on this box shows the agent's
+  table while a session runs, and Save to Agent sends an edit back.~~
+  Withdrawn 2026-09-25: the table, cache root, token, address and port
+  fields and the Save to Agent / Set Token buttons are gone from Blender's
+  preferences in agent mode (QCBridge commit "Blender's preferences are a
+  read-out of the agent"); the agent's window is the only place to edit.
+- [ ] **Owed on this box (2026-09-25):** with the reworked addon, a plain
+  launch of Blender shows the preferences as a read-out — role as the
+  agent has it, Open Agent Settings usable before any session — and the
+  QC Bridge panel has no role selector and no discover box. Start Session
+  adopts the agent's role: flip the agent to Send scene in its window,
+  start a session in Blender, and the panel says host without touching
+  Blender's role field; then back. The installed agent is started by
+  Start Session when none is registered (Task Manager: one agent).
 
 ## QCBridge — the Send/Receive switch is live on Windows (added and ticked 2026-09-24)
 
