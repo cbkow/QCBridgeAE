@@ -1,4 +1,4 @@
-// QCBridgeAE — the one pass from a host frame to the wire (PLAN.md D1).
+// QCBridgeAE — the one pass from a host frame to the wire (DESIGN-NOTES D1).
 //
 // A Transmit host hands over 32-bit float pixels in its own layout: ARGB (After
 // Effects) or BGRA (Premiere), stored bottom-up with a positive stride
@@ -6,7 +6,7 @@
 // top-down RGBA16F. Every per-pixel job — flip, reorder, convert — happens
 // here, in the copy that has to happen anyway, so the frame is touched once.
 //
-// The conversion is standard IEEE float -> half and nothing more (PLAN.md D4):
+// The conversion is standard IEEE float -> half and nothing more (DESIGN-NOTES D4):
 //   * round to nearest, ties to even;
 //   * sign kept — negative values are real in scene-linear work;
 //   * subnormals kept, as half subnormals where representable;

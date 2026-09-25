@@ -68,7 +68,7 @@ item under QCView is ticked or has a written reason.
 
 Entry: Phase 1's QCView runs.
 
-`PLAN.md` A5 and HANDOFF §What's yours: the ring as a named file mapping,
+`DESIGN-NOTES.md` A5 and HANDOFF §What's yours: the ring as a named file mapping,
 liveness without `kill(pid, 0)`, F16C conversion (the main path on Windows —
 the scalar fallback is 4.7× slower, measured), the Transmit device built
 from the Premiere SDK's Transmitter sample and installed into MediaCore.
@@ -179,7 +179,7 @@ get (an update channel, native capture) — honestly.
 - Tick the tracker item with a pointer to the evidence. An item that
   *differs* on Windows is not a failure; it is a line in the notes and,
   if the difference matters, a flag back to the Mac side.
-- If something contradicts `PLAN.md`, `HANDOFF-windows.md` or this file,
+- If something contradicts `DESIGN-NOTES.md`, `HANDOFF-windows.md` or this file,
   say so in the notes rather than working around it. A wrong plan everyone
   follows is worse than a right one nobody wrote down.
 - Stop and ask when: an SDK is missing; a Blender or Adobe behaviour

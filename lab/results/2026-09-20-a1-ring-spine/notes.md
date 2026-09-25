@@ -9,7 +9,7 @@ interesting sits on either side of it.
 
 ## Departure from the plan: shared memory, not IOSurface
 
-`PLAN.md` names IOSurface with a Mach-port handoff. Implementing it surfaced a
+`DESIGN-NOTES.md` names IOSurface with a Mach-port handoff. Implementing it surfaced a
 problem the plan hadn't reckoned with: `IOSurfaceCreateMachPort` /
 `IOSurfaceLookupFromMachPort` are the easy half. The hard half is the
 *rendezvous* — getting that port from one process to an unrelated one. Mach
@@ -30,7 +30,7 @@ memory the CPU wrote, which is why the pixel region is page-aligned and the
 unit test asserts it. A1b will confirm that against a real Metal texture; if it
 doesn't hold, this decision has to be revisited rather than worked around.
 
-**PLAN.md wants updating** once A1b confirms. Leaving it as written for now, so
+**DESIGN-NOTES.md wants updating** once A1b confirms. Leaving it as written for now, so
 the plan and this note disagree visibly rather than quietly.
 
 ## Two bugs worth recording

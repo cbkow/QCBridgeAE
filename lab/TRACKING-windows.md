@@ -83,7 +83,7 @@ exercised on Windows unless an item says who exercised it.
   — do not use it.
   *Windows 2026-09-23:* pulled `main` at `1d6e8ec`; commits `a4e2c6c`, `682da7f`, `c1f1e56` on top, unpushed.
 
-## QCBridgeAE — phase A5 (PLAN.md)
+## QCBridgeAE — phase A5 (DESIGN-NOTES.md)
 
 The producer side, so this comes first.
 

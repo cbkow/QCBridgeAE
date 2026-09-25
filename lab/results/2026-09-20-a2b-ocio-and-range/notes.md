@@ -17,7 +17,7 @@ A white solid with AE's Exposure effect, read back through the ring at 32 bpc:
 | +20 stops | ×1,048,576 | 322.5 |
 | +3 stops, linear-light conversion **bypassed** | ×8 | **8.00000** |
 
-Unclamped, straight through. The half ceiling (65504, PLAN.md D4) was never
+Unclamped, straight through. The half ceiling (65504, DESIGN-NOTES D4) was never
 reached even at +20 stops, so that clamp remains untested against real data.
 
 **A confound worth recording.** The first three rows are not `×multiplier` —

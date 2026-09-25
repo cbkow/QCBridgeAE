@@ -58,7 +58,7 @@ const char* host_state_name(HostState st) {
 
 uint16_t to_half(float f) {
     if (f <= 0.0f) return 0;
-    if (f > 65504.0f) f = 65504.0f;             // PLAN.md D4
+    if (f > 65504.0f) f = 65504.0f;             // DESIGN-NOTES D4
     uint32_t bits; std::memcpy(&bits, &f, 4);
     int32_t exp = static_cast<int32_t>((bits >> 23) & 0xFFu) - 127 + 15;
     const uint32_t man = bits & 0x7FFFFFu;
@@ -175,7 +175,7 @@ int run_producer(uint32_t w, uint32_t h, double fps, SourceTier tier) {
 // prints the bytes, which is what "bit-exact" has to mean.
 // ---------------------------------------------------------------------------
 // Minimal ICC reader: enough to name the profile, which is the whole job the
-// sidecar profile has under PLAN.md D5 — tell the user what AE says the
+// sidecar profile has under DESIGN-NOTES D5 — tell the user what AE says the
 // working space is, so a mismatch with their OCIO input choice is visible.
 // Deliberately not a colour engine.
 std::string icc_description(const std::string& icc) {

@@ -5,7 +5,7 @@
 // here follows from what the A4 probe measured
 // (lab/results/2026-09-21-a4-transmit-probe/), and each rule says where:
 //
-//   * Offer ARGB_4444_32f then BGRA_4444_32f, nothing else (PLAN.md D1). The
+//   * Offer ARGB_4444_32f then BGRA_4444_32f, nothing else (DESIGN-NOTES D1). The
 //     host prefers 32f whenever it is offered; offering an integer tier alone
 //     risks a 32 bpc project being clamped to 8 bits.
 //   * Request the working colour space in every mode, as a fresh PrSDKString
@@ -31,7 +31,7 @@
 //     not be able to drop frames without a trace.
 //
 // Privacy: a Transmit device receives no project paths or comp names; the
-// only label published is the host's name (PLAN.md §Privacy 5, 6).
+// only label published is the host's name (DESIGN-NOTES privacy 5, 6).
 
 // The one exported symbol. PrSDKEntry.h has DllExport for this, but it is
 // reached only through the play-module headers; spell it out here so the
@@ -96,7 +96,7 @@ constexpr const char* kLogPath = "/tmp/qcbridgeae-transmit.log";
 // its own.)
 constexpr const char* kPluginGUID = "1BB013B9-952D-4D6C-B35E-1E0EF3F52CA8";
 
-// Which host we are in decides the ring name (PLAN.md A6: one fixed name per
+// Which host we are in decides the ring name (DESIGN-NOTES A6: one fixed name per
 // host, so AE and Premiere running together do not overwrite each other).
 struct Host { const char* ring; const char* label; };
 

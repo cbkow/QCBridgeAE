@@ -33,7 +33,7 @@ Describe test material in neutral terms: "a 4K comp, ~30 layers, heavy
 gaussians" carries every fact a reader needs and none they shouldn't have.
 
 Anything that can't be written that way goes in `private/` instead, which is
-gitignored. That includes the Adobe SDKs — see `PLAN.md` §Privacy.
+gitignored. That includes the Adobe SDKs — see `DESIGN-NOTES.md` §Privacy.
 
 ## Layout
 

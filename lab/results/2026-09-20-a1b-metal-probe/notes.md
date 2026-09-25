@@ -26,7 +26,7 @@ silent upload would render identically. **Zero copy confirmed.**
 `MTLBuffer.contents` also comes back byte-identical to the pointer handed in,
 so Metal isn't relocating the mapping.
 
-**PLAN.md updated** (D8). A1a's note flagged the plan and the code as
+**DESIGN-NOTES.md updated** (D8). A1a's note flagged the plan and the code as
 deliberately disagreeing; they agree now, and the reason is recorded rather
 than quietly edited away.
 

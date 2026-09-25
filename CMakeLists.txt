@@ -1,4 +1,4 @@
-# QCBridgeAE — see PLAN.md for what this is and where it's going.
+# QCBridgeAE — see README.md and DESIGN-NOTES.md.
 #
 # Nothing here needs the Adobe SDKs: src/common is the transport spine and is
 # deliberately free of them, so the Windows machine can build and run the
@@ -35,7 +35,7 @@ endif()
 # qcbae-aegp — the After Effects tap (phase A2, Route B).
 #
 # Needs the AE SDK, which is Adobe Confidential and never enters this repo
-# (PLAN.md §Privacy 1). Point QCBAE_AE_SDK at your own copy; the default is
+# (DESIGN-NOTES privacy 1). Point QCBAE_AE_SDK at your own copy; the default is
 # the documented private/ location. Everything else in this project builds
 # without it, so a machine with no SDK still gets the spine and its tests.
 #
@@ -45,7 +45,7 @@ endif()
 # PiPL-only edit actually refreshes the bundle.
 # ---------------------------------------------------------------------------
 set(QCBAE_AE_SDK "${CMAKE_CURRENT_SOURCE_DIR}/private/sdk/AfterEffectsSDK"
-    CACHE PATH "After Effects SDK root (not included; see PLAN.md)")
+    CACHE PATH "After Effects SDK root (not included; see DESIGN-NOTES.md)")
 set(_ae_headers "${QCBAE_AE_SDK}/Examples/Headers")
 
 if(APPLE)
@@ -111,11 +111,11 @@ endif()
 #
 # Needs the Premiere Pro SDK, also Adobe Confidential and also private/ only.
 # A Transmit plugin on macOS is a plain BNDL bundle: no PiPL, and its whole
-# ABI is one exported symbol, xTransmitEntry (PLAN.md §The tap). The same
+# ABI is one exported symbol, xTransmitEntry (DESIGN-NOTES, the tap). The same
 # bundle loads in AE and Premiere from MediaCore (D6).
 # ---------------------------------------------------------------------------
 set(QCBAE_PR_SDK "${CMAKE_CURRENT_SOURCE_DIR}/private/sdk/PremiereProSDK"
-    CACHE PATH "Premiere Pro SDK root (not included; see PLAN.md)")
+    CACHE PATH "Premiere Pro SDK root (not included; see DESIGN-NOTES.md)")
 set(_pr_headers "${QCBAE_PR_SDK}/Examples/Headers")
 
 if(APPLE AND EXISTS "${_pr_headers}/PrSDKTransmit.h")
@@ -213,7 +213,7 @@ if(BUILD_TESTING)
     set_tests_properties(ring_tearing PROPERTIES TIMEOUT 120)
 
     # The Transmit conversion pass, read back the way QCView reads it, and the
-    # portable half conversion held bit for bit to the hardware (PLAN.md D4).
+    # portable half conversion held bit for bit to the hardware (DESIGN-NOTES D4).
     add_executable(convert_test tests/convert_test.cpp)
     target_link_libraries(convert_test PRIVATE qcbae_common)
     add_test(NAME convert COMMAND convert_test)

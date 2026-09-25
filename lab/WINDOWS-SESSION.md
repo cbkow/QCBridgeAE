@@ -24,7 +24,7 @@ points to, in that order.*
    and verify work, not the paired runs.
 
 Then, per repo, the documents the checklist cites when you get there:
-QCView's `scripts/RELEASE.md`; QCBridgeAE's `PLAN.md`; QCBridge's
+QCView's `scripts/RELEASE.md`; QCBridgeAE's `DESIGN-NOTES.md`; QCBridge's
 `SYNC-AUDIT.md`, `COVERAGE.md`, `CACHES.md`, `smokes/README.md` and
 `ARCHITECTURE.md` (read the banner at its top: it predates the rest).
 

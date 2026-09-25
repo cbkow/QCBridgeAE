@@ -13,7 +13,7 @@
 // has already rendered. Mitigated here by throttling and by never rendering
 // when nothing has changed — not solved.
 //
-// Privacy: no project paths and no comp names reach the log (PLAN.md
+// Privacy: no project paths and no comp names reach the log (DESIGN-NOTES.md
 // §Privacy 5). The comp name travels in the sidecar, in memory, to the viewer.
 
 #include "AEConfig.h"
@@ -93,7 +93,7 @@ double now_seconds() {
 
 // --- the working colorspace, straight from AE ------------------------------
 // This is the field that makes the signal interpretable rather than merely
-// preserved (PLAN.md D5). AE hands us the real ICC; we never infer one.
+// preserved (DESIGN-NOTES D5). AE hands us the real ICC; we never infer one.
 // Takes the comp, not null: AEGP_GetNewWorkingSpaceColorProfile's second
 // parameter is an AEGP_CompH. Passing null returns an error and leaves the
 // sidecar with no profile at all, which A3 would then have to guess around.
@@ -142,7 +142,7 @@ void publish_icc_profile(AEGP_CompH compH) {
 
 uint16_t to_half(float f) {
     if (!(f > 0.0f)) return 0;                  // also catches NaN
-    if (f > 65504.0f) f = 65504.0f;             // PLAN.md D4
+    if (f > 65504.0f) f = 65504.0f;             // DESIGN-NOTES D4
     uint32_t bits; std::memcpy(&bits, &f, 4);
     const int32_t exp = static_cast<int32_t>((bits >> 23) & 0xFFu) - 127 + 15;
     const uint32_t man = bits & 0x7FFFFFu;
@@ -222,7 +222,7 @@ A_Err render_and_publish() {
     if (err != A_Err_NONE || roH == nullptr) return err;
 
     // Take the project's own bit depth rather than forcing one: the whole
-    // point is to carry what AE actually computed (PLAN.md D1).
+    // point is to carry what AE actually computed (DESIGN-NOTES D1).
     AEGP_WorldType world_type = AEGP_WorldType_NONE;
     ERR(S_ro->AEGP_SetTime(roH, timeT));
     ERR(S_ro->AEGP_GetWorldType(roH, &world_type));

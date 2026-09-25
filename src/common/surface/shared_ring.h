@@ -6,7 +6,7 @@
 // samples the newest slot in place. Latest-wins throughout: a consumer that
 // falls behind skips frames rather than accruing arrears.
 //
-// Why shared memory rather than IOSurface, which PLAN.md names: IOSurface's
+// Why shared memory rather than IOSurface, which the design notes name: IOSurface's
 // cross-process handoff (IOSurfaceCreateMachPort / LookupFromMachPort) needs a
 // Mach rendezvous that a plugin living inside AE cannot get without a
 // LaunchAgent-registered service. A page-aligned mmap is rendezvous-by-path,
@@ -56,7 +56,7 @@ inline constexpr size_t kMaxShmName = 31u;
 // `latest` carries (sequence, slot) in one word so a consumer never has to
 // infer where a frame landed. 8 bits of slot caps the ring at 255, which is
 // ~250 more than anything sane, and leaves 56 bits of sequence.
-// Fixed ring names, one per host (PLAN.md A6). A consumer lists these; a
+// Fixed ring names, one per host (DESIGN-NOTES A6). A consumer lists these; a
 // second running copy of the same host would collide, which v1 accepts.
 inline constexpr const char* kRingNameAfterEffects = "/qcbae-ae";
 inline constexpr const char* kRingNamePremiere     = "/qcbae-premiere";

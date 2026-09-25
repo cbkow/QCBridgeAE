@@ -18,7 +18,7 @@
 //     numbers. A result that no control can move proves nothing.
 //
 // Config: /tmp/qcbridgeae-transmit.conf, key = value, '#' comments. All keys
-// optional; defaults are the design in PLAN.md D1/D5.
+// optional; defaults are the design in DESIGN-NOTES D1/D5.
 //   modes       = argb8, argb16, argb32f, bgra8, bgra16, bgra32f
 //                 (also *32f_linear, prgb*, bgrp*, xrgb*, bgrx*, any)
 //   colorspace  = working | unset | <a predefined name, e.g. BT.709 RGB Full (Scene)>
@@ -31,7 +31,7 @@
 //   latency     = 0   (frames of preroll the host sends ahead of playback)
 //
 // Privacy: the host gives a Transmit device no project paths or comp names,
-// and nothing here asks for them (PLAN.md §Privacy 5, 6).
+// and nothing here asks for them (DESIGN-NOTES privacy 5, 6).
 
 // The one exported symbol. PrSDKEntry.h has DllExport for this, but it is
 // reached only through the play-module headers; spell it out here so the

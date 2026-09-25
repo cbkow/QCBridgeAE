@@ -1,6 +1,6 @@
 // A1b exit criterion: is the ring actually zero-copy on the GPU side?
 //
-// PLAN.md justified shared memory over IOSurface on the claim that
+// the design notes justified shared memory over IOSurface on the claim that
 // makeBuffer(bytesNoCopy:) over these pages gives the GPU the exact memory the
 // CPU wrote. That is a claim, not a fact, until something checks it — and
 // "the window looks right" cannot distinguish a shared mapping from a silent

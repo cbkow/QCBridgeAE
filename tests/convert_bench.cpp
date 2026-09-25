@@ -1,5 +1,5 @@
 // What each AE tier costs to get onto the wire. This is the measurement that
-// settled PLAN.md D1: converting the integer tiers to half costs 4.5x (8 bpc)
+// settled DESIGN-NOTES D1: converting the integer tiers to half costs 4.5x (8 bpc)
 // and 1.2x (16 bpc) against carrying them natively, for precision that is
 // either already exact or actively worse.
 //
@@ -152,7 +152,7 @@ int main() {
 #endif
     // The A6 product pass (src/common/convert/half_convert.*): flip a
     // bottom-up host frame, reorder ARGB/BGRA to RGBA and convert to half —
-    // IEEE, nothing clamped (PLAN.md D4) — into a padded destination, in one
+    // IEEE, nothing clamped (DESIGN-NOTES D4) — into a padded destination, in one
     // pass. Compare with the plain conversion above: the flip and reorder
     // should cost next to nothing on top of it.
     std::printf("\nA6 Transmit pass, 4x32f host frame -> top-down RGBA16F (fast path: %s):\n",

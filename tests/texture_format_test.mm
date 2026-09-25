@@ -1,4 +1,4 @@
-// PLAN.md D1 rests on one claim: the three per-tier wire formats sample
+// DESIGN-NOTES D1 rests on one claim: the three per-tier wire formats sample
 // identically through a single `texture2d<float>` binding, so carrying each AE
 // tier natively costs a pixelFormat switch rather than three code paths.
 //
@@ -8,7 +8,7 @@
 // It also pins the value_scale contract: AE 16 bpc white is 32768 inside a
 // 0..65535 unorm container, so hardware normalization lands on ~0.5 and the
 // image is half-bright until the scale corrects it. That is the silent
-// transformation PLAN.md D3 exists to prevent, and this is where it's caught.
+// transformation DESIGN-NOTES D3 exists to prevent, and this is where it's caught.
 
 #import <Metal/Metal.h>
 

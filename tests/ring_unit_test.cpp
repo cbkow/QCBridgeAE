@@ -1,5 +1,5 @@
 // Guard rails and the ICC region. The ICC blob is the piece that makes the
-// signal interpretable (PLAN.md D5), and it changes on project settings
+// signal interpretable (DESIGN-NOTES D5), and it changes on project settings
 // rather than per frame — so it gets its own seqlock and a generation counter
 // the consumer can cache against.
 

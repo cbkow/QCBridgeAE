@@ -6,7 +6,7 @@ Device: `src/transmit/qcbae_transmit.cpp`, pass: `src/common/convert/half_conver
 ## The conversion pass
 
 One pass from a host frame to the wire: flip (bottom-up), reorder
-(ARGB/BGRA → RGBA), IEEE convert to half — never clamp (PLAN.md D4).
+(ARGB/BGRA → RGBA), IEEE convert to half — never clamp (DESIGN-NOTES D4).
 `qcbae-convbench`, 3840×2160, this machine:
 
 | | ms / frame | fps |
