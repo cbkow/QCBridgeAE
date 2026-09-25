@@ -22,7 +22,7 @@ Decided with chris (2026-09-21):
 
 Work happens on a new branch `qcbae-live` in QCView-Player (GPL); chris
 pushes. Build: `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
--DCMAKE_PREFIX_PATH=/Users/chris/Qt/6.11.1/macos
+-DCMAKE_PREFIX_PATH=$HOME/Qt/6.11.1/macos
 -DCMAKE_OSX_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`.
 
 ## Design
