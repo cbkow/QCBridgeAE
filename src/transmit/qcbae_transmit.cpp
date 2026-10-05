@@ -155,6 +155,16 @@ struct Ring {
     // while any instance has video on; paused only when none do, with the
     // reason of the last deactivation.
     std::set<csSDK_int32> video_on;
+
+    // Every instance between CreateInstance and DisposeInstance. When the
+    // last one goes the ring is retired: on quit AE disposes its instances
+    // and then calls neither Shutdown nor the unload entry (measured
+    // 2026-10-05), and on macOS a ring that is never unlinked stays in the
+    // kernel, pages and all, after the host is gone (582 MiB found behind a
+    // dead AE). Across 119 logged sessions the count reached zero at quit and
+    // otherwise only 7 times, each a pause of 9 s or more; the next frame
+    // simply creates the ring again.
+    std::set<csSDK_int32> instances;
     HostState last_pause = HostState::Paused;
 };
 Ring S;
@@ -251,8 +261,9 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
     });
 }
 
-// The ring outlives module resets on purpose; it is retired only when the
-// host unloads the module (xTransmitEntry with loadModule false).
+// The ring outlives module resets on purpose. It is retired when the last
+// instance is disposed (see DisposeInstance), not here: AE quits without
+// calling Shutdown at all.
 tmResult Shutdown(tmStdParms* sp) {
     return guarded("Shutdown", [&] {
         Plugin* P = plugin(sp);
@@ -262,6 +273,7 @@ tmResult Shutdown(tmStdParms* sp) {
         if (P->str)  P->sp->ReleaseSuite(kPrSDKStringSuite, kPrSDKStringSuiteVersion);
         delete P;
         sp->ioPrivatePluginData = nullptr;
+        logf("shutdown");
         return tmResult_Success;
     });
 }
@@ -269,6 +281,7 @@ tmResult Shutdown(tmStdParms* sp) {
 tmResult CreateInstance(const tmStdParms*, tmInstance* inst) {
     return guarded("CreateInstance", [&] {
         inst->ioPrivateInstanceData = nullptr;
+        S.instances.insert(inst->inInstanceID);
         // Informational only: AE reports a 720x480 placeholder here until a
         // comp is open (A4). Geometry comes from each frame.
         logf("instance %d: %dx%d", inst->inInstanceID, inst->inVideoWidth, inst->inVideoHeight);
@@ -281,6 +294,8 @@ tmResult DisposeInstance(const tmStdParms*, tmInstance* inst) {
         S.video_on.erase(inst->inInstanceID);
         publish_state();
         logf("instance %d disposed -> state %u", inst->inInstanceID, static_cast<unsigned>(derived_state()));
+        S.instances.erase(inst->inInstanceID);
+        if (S.instances.empty()) retire_ring("last instance disposed");
         return tmResult_Success;
     });
 }
