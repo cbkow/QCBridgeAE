@@ -29,6 +29,8 @@
 //                 Measured (A4, Adobe CMS): AE reads the PrSDKString in
 //                 ioProfileRec.outName; the raw buffer alone is ignored.
 //   latency     = 0   (frames of preroll the host sends ahead of playback)
+//   size        = any | WxH   (a fixed raster the host scales to, as a hardware
+//                 device asks; any = the host's own size)
 //
 // Privacy: the host gives a Transmit device no project paths or comp names,
 // and nothing here asks for them (DESIGN-NOTES privacy 5, 6).
@@ -184,6 +186,7 @@ struct Config {
     prSEIColorCodesRec sei_codes;
     CsEncoding  encoding       = CsEncoding::Both;
     int         latency_frames = 0;
+    int         width = 0, height = 0;    // the size asked of the host; 0 = any
 };
 
 std::string trim(const std::string& s) {
@@ -247,6 +250,15 @@ Config load_config() {
                        : val == "name"   ? CsEncoding::Name : CsEncoding::Both;
         } else if (key == "latency") {
             c.latency_frames = std::atoi(val.c_str());
+        } else if (key == "size") {
+            // "WxH" asks the host to scale to that raster, the way a hardware
+            // device does; "any" follows the host's size.
+            int w = 0, h = 0;
+            if (val != "any" && std::sscanf(val.c_str(), "%dx%d", &w, &h) != 2) {
+                logf("config: size '%s' is not WxH or any; using any", val.c_str());
+                w = h = 0;
+            }
+            c.width = w; c.height = h;
         } else {
             logf("config: unknown key '%s' ignored", key.c_str());
         }
@@ -466,8 +478,8 @@ tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance* inst, csSDK_int3
         }
         const PrSDKColorSpaceType prefilled = out->outColorSpaceRec.outColorSpaceType;
 
-        out->outWidth       = 0;             // any: we follow the host's size
-        out->outHeight      = 0;
+        out->outWidth       = P->cfg.width;   // 0 = any: we follow the host's size
+        out->outHeight      = P->cfg.height;
         out->outPARNum      = 0;
         out->outPARDen      = 0;
         out->outFieldType   = prFieldsAny;
