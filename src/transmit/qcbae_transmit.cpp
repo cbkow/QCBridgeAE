@@ -23,13 +23,16 @@
 //     module before shutting down the old (A4 section "Also observed").
 //   * Host state goes in the ring header, so QCView can explain a freeze —
 //     above all the focus-loss pause AE applies by default (A4 section 12).
-//   * A comp larger than 3840x2160 is asked for at the size that fits inside
-//     it, aspect kept, so the host scales before it builds the frame. Asked
-//     for at "any" size, an 8000x8000 comp costs the host a 977 MiB float
-//     frame per push: After Effects on Windows ran at 0.6 fps with this
-//     device, 24 fps with a hardware device that names its raster, and the
-//     pass below was 48 ms of those 1600 (measured 2026-10-06). Anything that
-//     fits is still asked for at "any" size and arrives pixel for pixel.
+//   * A frame larger than 3840x2160 makes the device ask the host, from then
+//     on, for the size that fits inside it, aspect kept, so the host scales
+//     before it builds the frame. Asked for at "any" size, an 8000x8000 comp
+//     costs the host a 977 MiB float frame per push: After Effects on Windows
+//     ran at 0.6 fps with this device, 24 fps with a hardware device that
+//     names its raster, and the pass below was 48 ms of those 1600 (measured
+//     2026-10-06). The size comes from the frame, never from tmInstance: AE
+//     described an instance as 400x400 while pushing 8000x8000 through it.
+//     EXPERIMENT, not shippable: the request stays until the host quits, so
+//     a smaller comp viewed afterwards arrives scaled to it.
 //   * Every pushed frame is converted. An earlier version silently skipped a
 //     frame whose PPix unique key matched the last one (each viewer change
 //     pushes two frames ~3 ms apart). In AE it published one frame and then
@@ -193,9 +196,14 @@ struct Window {
     uint32_t gaps = 0;                     // intervals between pushes, idle ones left out
     double   gap_sum = 0;                  // seconds
     std::chrono::steady_clock::time_point last {};
+    std::chrono::steady_clock::time_point line_at {};   // when the last line was written
     char     line[160] {};                 // a "published" line waiting for this push's timing
 };
 Window S_win;
+
+// Every 240th frame is a line every ten seconds at 24 fps and every four
+// minutes at 1 fps, which is when the timing matters most.
+constexpr double kLineEverySeconds = 10.0;
 
 // A longer wait than this between two pushes is the user doing nothing, not
 // the host being slow. Far above the slowest cadence seen (1.6 s a frame).
@@ -222,6 +230,7 @@ void note_push(std::chrono::steady_clock::time_point began) {
     const auto last = S_win.last;
     S_win = Window{};
     S_win.last = last;
+    S_win.line_at = now;
 }
 
 // The largest frame the device asks a host for. A comp inside it is taken as
@@ -255,6 +264,12 @@ static_assert(same(capped_size(9216, 3164), {3840, 1318}), "wide: width limits")
 static_assert(same(capped_size(2160, 3840), {1215, 2160}), "portrait");
 static_assert(same(capped_size(3841, 100), {3840, 100}),   "one pixel over");
 static_assert(same(capped_size(100000, 1), {3840, 1}),     "never rounds to nothing");
+
+// What QueryVideoMode asks every instance for: {0, 0} until a frame over the
+// cap has been seen. Process-wide like the ring, because the reset that makes
+// the host ask again starts a new module.
+Size S_want {0, 0};
+bool S_reset_due = false;
 
 // Replacing a mapping tells whoever holds the old one to let go first.
 void retire_ring(const char* why) {
@@ -358,6 +373,17 @@ tmResult Shutdown(tmStdParms* sp) {
     });
 }
 
+// Polled by the host. A reset shuts every open plug-in down and starts it
+// again, which is the only way to have QueryVideoMode asked a second time.
+tmResult NeedsReset(const tmStdParms*, prBool* outReset) {
+    return guarded("NeedsReset", [&] {
+        *outReset = S_reset_due ? kPrTrue : kPrFalse;
+        if (S_reset_due) logf("module reset requested, to ask for %dx%d", S_want.w, S_want.h);
+        S_reset_due = false;
+        return tmResult_Success;
+    });
+}
+
 tmResult CreateInstance(const tmStdParms*, tmInstance* inst) {
     return guarded("CreateInstance", [&] {
         inst->ioPrivateInstanceData = nullptr;
@@ -386,15 +412,13 @@ tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance* inst, csSDK_int3
         if (index < 0 || index >= kCount) return tmResult_ErrorInvalidArgument;
         Plugin* P = plugin(sp);
 
-        // "Any" for what fits inside the cap: we follow the host's size. A
-        // larger comp is asked for scaled, so the host never builds the
-        // full-size float frame. The instance's size is the comp's here (AE
-        // makes an instance per comp it shows; only the one it makes before a
-        // comp is open reports a 720x480 placeholder).
-        const Size want = inst != nullptr ? capped_size(inst->inVideoWidth, inst->inVideoHeight) : Size{0, 0};
-        if (index == 0 && want.w != 0)
-            logf("instance %d: %dx%d is over %dx%d, asking for %dx%d", inst->inInstanceID,
-                 inst->inVideoWidth, inst->inVideoHeight, kMaxWidth, kMaxHeight, want.w, want.h);
+        // "Any" until a frame over the cap has been pushed (see publish):
+        // we follow the host's size. After that, the size that frame fits
+        // into, so the host never builds the full-size float frame again.
+        const Size want = S_want;
+        if (index == 0 && want.w != 0 && inst != nullptr)
+            logf("instance %d (%dx%d by the host's account): asking for %dx%d", inst->inInstanceID,
+                 inst->inVideoWidth, inst->inVideoHeight, want.w, want.h);
         out->outWidth       = want.w;
         out->outHeight      = want.h;
         out->outPARNum      = 0;
@@ -488,18 +512,30 @@ void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
     S.ring.commit(d);
     publish_state();   // a new ring starts Active (zeroed); make it tell the truth
 
-    // Logged on the first frame, every size change, every 240th frame and any
-    // non-finite frame — enough to see frames flowing without a line each.
+    // Logged on the first frame, every size change, every 240th frame, after
+    // ten seconds without a line and on any non-finite frame — enough to see
+    // frames flowing without a line each.
     const bool resized = uw != S.last_w || uh != S.last_h;
     S.last_w = uw; S.last_h = uh;
+    // A frame over the cap: ask the host, through a module reset, to scale
+    // from now on. Asked once per size, so a host that ignores the request
+    // is not reset again; its frames keep saying "over the cap" below.
+    const Size fit = capped_size(w, hgt);
+    if (fit.w != 0 && !same(fit, S_want)) {
+        S_want = fit;
+        S_reset_due = true;
+        logf("frame %ux%u is over %dx%d: asking the host for %dx%d from now on",
+             uw, uh, kMaxWidth, kMaxHeight, fit.w, fit.h);
+    }
+
     // The line is written by note_push, once this push's own time is known.
-    // A frame over the cap means the host did not scale as asked — say so.
-    const bool over = uw > static_cast<uint32_t>(kMaxWidth) || uh > static_cast<uint32_t>(kMaxHeight);
-    if (++S.published == 1 || resized || (S.published % 240) == 0 || cr.has_inf || cr.has_nan)
+    const bool slow = std::chrono::duration<double>(std::chrono::steady_clock::now() - S_win.line_at).count()
+                      >= kLineEverySeconds;
+    if (++S.published == 1 || resized || (S.published % 240) == 0 || slow || cr.has_inf || cr.has_nan)
         std::snprintf(S_win.line, sizeof S_win.line, "published %llu (%ux%u %s%s%s%s)",
                       (unsigned long long)S.published, uw, uh, order == HostOrder::ARGB ? "ARGB" : "BGRA",
                       cr.has_inf ? ", has inf" : "", cr.has_nan ? ", has NaN" : "",
-                      over ? ", over the cap: the host did not scale" : "");
+                      fit.w != 0 ? ", over the cap" : "");
 }
 
 tmResult PushVideo(const tmStdParms* sp, const tmInstance*, const tmPushVideo* pv) {
@@ -526,6 +562,7 @@ tmResult xTransmitEntry(csSDK_int32 interfaceVersion, prBool loadModule, piSuite
         std::memset(out, 0, sizeof *out);   // 0 = unsupported, per PrSDKTransmit.h
         out->Startup            = Startup;
         out->Shutdown           = Shutdown;
+        out->NeedsReset         = NeedsReset;
         out->CreateInstance     = CreateInstance;
         out->DisposeInstance    = DisposeInstance;
         out->QueryVideoMode     = QueryVideoMode;
