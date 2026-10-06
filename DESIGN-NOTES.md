@@ -34,6 +34,13 @@ bundle serves both hosts. It offers ARGB and BGRA 32-bit float in the host's
 working colour space and nothing else, so the host hands over the pixels it
 computed without a transform.
 
+A comp that fits inside 3840×2160 is asked for at "any" size and arrives
+pixel for pixel. A larger one is asked for at the size that fits inside
+3840×2160, aspect kept, and the host scales it before building the frame.
+Asked for at full size, an 8000×8000 comp is a 977 MiB float frame per push;
+After Effects on Windows ran at 0.6 fps that way, against 24 fps into a
+hardware device that names its raster.
+
 ## Rings
 
 - **A2.** The first tap was an AEGP that rendered the active comp on idle;

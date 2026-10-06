@@ -23,6 +23,13 @@
 //     module before shutting down the old (A4 section "Also observed").
 //   * Host state goes in the ring header, so QCView can explain a freeze —
 //     above all the focus-loss pause AE applies by default (A4 section 12).
+//   * A comp larger than 3840x2160 is asked for at the size that fits inside
+//     it, aspect kept, so the host scales before it builds the frame. Asked
+//     for at "any" size, an 8000x8000 comp costs the host a 977 MiB float
+//     frame per push: After Effects on Windows ran at 0.6 fps with this
+//     device, 24 fps with a hardware device that names its raster, and the
+//     pass below was 48 ms of those 1600 (measured 2026-10-06). Anything that
+//     fits is still asked for at "any" size and arrives pixel for pixel.
 //   * Every pushed frame is converted. An earlier version silently skipped a
 //     frame whose PPix unique key matched the last one (each viewer change
 //     pushes two frames ~3 ms apart). In AE it published one frame and then
@@ -64,6 +71,7 @@
 #  include <windows.h>
 #endif
 
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -175,6 +183,78 @@ HostState derived_state() {
 void publish_state() {
     if (S.ring.valid()) S.ring.set_host_state(derived_state());
 }
+
+// What a push costs the host's thread and how fast pushes come, over the
+// frames since the last "published" line. Without it the log says that frames
+// flowed and nothing about how long each took: a 1.6 s push looked like any other.
+struct Window {
+    uint32_t n = 0;
+    double   push_sum = 0, push_max = 0;   // ms inside PushVideo, dispose included
+    uint32_t gaps = 0;                     // intervals between pushes, idle ones left out
+    double   gap_sum = 0;                  // seconds
+    std::chrono::steady_clock::time_point last {};
+    char     line[160] {};                 // a "published" line waiting for this push's timing
+};
+Window S_win;
+
+// A longer wait than this between two pushes is the user doing nothing, not
+// the host being slow. Far above the slowest cadence seen (1.6 s a frame).
+constexpr double kIdleGapSeconds = 5.0;
+
+void note_push(std::chrono::steady_clock::time_point began) {
+    const auto now = std::chrono::steady_clock::now();
+    const double ms = std::chrono::duration<double, std::milli>(now - began).count();
+    ++S_win.n;
+    S_win.push_sum += ms;
+    if (ms > S_win.push_max) S_win.push_max = ms;
+    if (S_win.last != std::chrono::steady_clock::time_point{}) {
+        const double gap = std::chrono::duration<double>(began - S_win.last).count();
+        if (gap < kIdleGapSeconds) { ++S_win.gaps; S_win.gap_sum += gap; }
+    }
+    S_win.last = began;
+    if (S_win.line[0] == 0) return;
+
+    char rate[48] = "";
+    if (S_win.gaps > 0 && S_win.gap_sum > 0)
+        std::snprintf(rate, sizeof rate, ", %.2f fps", S_win.gaps / S_win.gap_sum);
+    logf("%s; last %u: push mean %.2f max %.2f ms%s", S_win.line, S_win.n,
+         S_win.push_sum / S_win.n, S_win.push_max, rate);
+    const auto last = S_win.last;
+    S_win = Window{};
+    S_win.last = last;
+}
+
+// The largest frame the device asks a host for. A comp inside it is taken as
+// it comes; a larger one is asked for at the size that fits, aspect kept.
+constexpr int32_t kMaxWidth = 3840, kMaxHeight = 2160;
+
+struct Size { int32_t w, h; };
+
+// {0, 0} = "any": the host sends its own size.
+constexpr Size capped_size(int32_t w, int32_t h) {
+    if (w <= 0 || h <= 0 || (w <= kMaxWidth && h <= kMaxHeight)) return {0, 0};
+    const int64_t W = w, H = h;
+    // Whichever side reaches its limit first sets the scale; the other rounds
+    // to nearest and never to nothing.
+    if (W * kMaxHeight >= H * kMaxWidth) {
+        const auto oh = static_cast<int32_t>((H * kMaxWidth + W / 2) / W);
+        return {kMaxWidth, oh > 0 ? oh : 1};
+    }
+    const auto ow = static_cast<int32_t>((W * kMaxHeight + H / 2) / H);
+    return {ow > 0 ? ow : 1, kMaxHeight};
+}
+constexpr bool same(Size a, Size b) { return a.w == b.w && a.h == b.h; }
+static_assert(same(capped_size(3840, 2160), {0, 0}),       "what fits is not touched");
+static_assert(same(capped_size(1920, 1080), {0, 0}),       "what fits is not touched");
+static_assert(same(capped_size(720, 480), {0, 0}),         "AE's placeholder instance");
+static_assert(same(capped_size(0, 0), {0, 0}),             "no size reported");
+static_assert(same(capped_size(7680, 4320), {3840, 2160}), "8K UHD");
+static_assert(same(capped_size(6720, 3780), {3840, 2160}), "16:9 above the cap");
+static_assert(same(capped_size(8000, 8000), {2160, 2160}), "square: height limits");
+static_assert(same(capped_size(9216, 3164), {3840, 1318}), "wide: width limits");
+static_assert(same(capped_size(2160, 3840), {1215, 2160}), "portrait");
+static_assert(same(capped_size(3841, 100), {3840, 100}),   "one pixel over");
+static_assert(same(capped_size(100000, 1), {3840, 1}),     "never rounds to nothing");
 
 // Replacing a mapping tells whoever holds the old one to let go first.
 void retire_ring(const char* why) {
@@ -300,14 +380,23 @@ tmResult DisposeInstance(const tmStdParms*, tmInstance* inst) {
     });
 }
 
-tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance*, csSDK_int32 index, tmVideoMode* out) {
+tmResult QueryVideoMode(const tmStdParms* sp, const tmInstance* inst, csSDK_int32 index, tmVideoMode* out) {
     return guarded("QueryVideoMode", [&] {
         constexpr int kCount = static_cast<int>(sizeof kModes / sizeof kModes[0]);
         if (index < 0 || index >= kCount) return tmResult_ErrorInvalidArgument;
         Plugin* P = plugin(sp);
 
-        out->outWidth       = 0;   // any: we follow the host's size
-        out->outHeight      = 0;
+        // "Any" for what fits inside the cap: we follow the host's size. A
+        // larger comp is asked for scaled, so the host never builds the
+        // full-size float frame. The instance's size is the comp's here (AE
+        // makes an instance per comp it shows; only the one it makes before a
+        // comp is open reports a 720x480 placeholder).
+        const Size want = inst != nullptr ? capped_size(inst->inVideoWidth, inst->inVideoHeight) : Size{0, 0};
+        if (index == 0 && want.w != 0)
+            logf("instance %d: %dx%d is over %dx%d, asking for %dx%d", inst->inInstanceID,
+                 inst->inVideoWidth, inst->inVideoHeight, kMaxWidth, kMaxHeight, want.w, want.h);
+        out->outWidth       = want.w;
+        out->outHeight      = want.h;
         out->outPARNum      = 0;
         out->outPARDen      = 0;
         out->outFieldType   = prFieldsAny;
@@ -403,13 +492,18 @@ void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
     // non-finite frame — enough to see frames flowing without a line each.
     const bool resized = uw != S.last_w || uh != S.last_h;
     S.last_w = uw; S.last_h = uh;
+    // The line is written by note_push, once this push's own time is known.
+    // A frame over the cap means the host did not scale as asked — say so.
+    const bool over = uw > static_cast<uint32_t>(kMaxWidth) || uh > static_cast<uint32_t>(kMaxHeight);
     if (++S.published == 1 || resized || (S.published % 240) == 0 || cr.has_inf || cr.has_nan)
-        logf("published %llu (%ux%u %s%s%s)", (unsigned long long)S.published,
-             uw, uh, order == HostOrder::ARGB ? "ARGB" : "BGRA",
-             cr.has_inf ? ", has inf" : "", cr.has_nan ? ", has NaN" : "");
+        std::snprintf(S_win.line, sizeof S_win.line, "published %llu (%ux%u %s%s%s%s)",
+                      (unsigned long long)S.published, uw, uh, order == HostOrder::ARGB ? "ARGB" : "BGRA",
+                      cr.has_inf ? ", has inf" : "", cr.has_nan ? ", has NaN" : "",
+                      over ? ", over the cap: the host did not scale" : "");
 }
 
 tmResult PushVideo(const tmStdParms* sp, const tmInstance*, const tmPushVideo* pv) {
+    const auto began = std::chrono::steady_clock::now();
     Plugin* P = plugin(sp);
     const tmResult r = guarded("PushVideo", [&] {
         if (P != nullptr && P->ppix != nullptr && pv->inFrameCount > 0)
@@ -419,6 +513,7 @@ tmResult PushVideo(const tmStdParms* sp, const tmInstance*, const tmPushVideo* p
     // "The plug-in is responsible for disposing of all passed in ppix."
     if (P != nullptr && P->ppix != nullptr)
         for (csSDK_size_t i = 0; i < pv->inFrameCount; ++i) P->ppix->Dispose(pv->inFrames[i].inFrame);
+    note_push(began);
     return r;
 }
 
