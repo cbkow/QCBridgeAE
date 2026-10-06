@@ -36,10 +36,15 @@ computed without a transform.
 
 A comp that fits inside 3840×2160 is asked for at "any" size and arrives
 pixel for pixel. A larger one is asked for at the size that fits inside
-3840×2160, aspect kept, and the host scales it before building the frame.
-Asked for at full size, an 8000×8000 comp is a 977 MiB float frame per push;
-After Effects on Windows ran at 0.6 fps that way, against 24 fps into a
-hardware device that names its raster.
+3840×2160, aspect kept, learned from its first frame; the host then scales
+before building the frame. The request is dropped whenever another instance
+goes live, so no comp inherits another's raster. Asked for at full size, an
+8000×8000 comp is a 977 MiB float frame per push, built inside the host's
+playback loop: 13 fps on the Mac and 0.6 fps on Windows at 16 bpc, 24 fps
+capped. The cap's size made no difference to the host's rate between 64×64
+and 2160×2160, so there is one cap and no setting. In a 32 bpc project the
+host spends ~65 ms a frame on any Transmit device whatever it asks for, which
+no device can change (measured 2026-10-06).
 
 ## Rings
 

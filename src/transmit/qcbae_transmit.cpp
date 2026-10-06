@@ -23,16 +23,18 @@
 //     module before shutting down the old (A4 section "Also observed").
 //   * Host state goes in the ring header, so QCView can explain a freeze —
 //     above all the focus-loss pause AE applies by default (A4 section 12).
-//   * A frame larger than 3840x2160 makes the device ask the host, from then
-//     on, for the size that fits inside it, aspect kept, so the host scales
-//     before it builds the frame. Asked for at "any" size, an 8000x8000 comp
-//     costs the host a 977 MiB float frame per push: After Effects on Windows
-//     ran at 0.6 fps with this device, 24 fps with a hardware device that
-//     names its raster, and the pass below was 48 ms of those 1600 (measured
-//     2026-10-06). The size comes from the frame, never from tmInstance: AE
-//     described an instance as 400x400 while pushing 8000x8000 through it.
-//     EXPERIMENT, not shippable: the request stays until the host quits, so
-//     a smaller comp viewed afterwards arrives scaled to it.
+//   * A frame larger than 3840x2160 makes the device ask the host for the
+//     size that fits inside it, aspect kept, so the host scales before it
+//     builds the frame. Asked for at "any" size, an 8000x8000 comp costs the
+//     host a 977 MiB float frame per push, built and freed inside its
+//     playback loop: 13 fps on an M5 Max at 16 bpc, 0.6 fps on a Windows
+//     workstation, against 24 fps once capped (measured 2026-10-06; the cap's
+//     own size made no difference between 64x64 and 2160x2160, so there is
+//     one cap and no setting). The size comes from the frame, never from
+//     tmInstance: AE described an instance as 400x400 while pushing 8000x8000
+//     through it. And it is forgotten when another instance goes live, since
+//     the next comp has another aspect and a kept raster would letterbox or
+//     stretch it: that costs one full-size frame per comp switch.
 //   * Every pushed frame is converted. An earlier version silently skipped a
 //     frame whose PPix unique key matched the last one (each viewer change
 //     pushes two frames ~3 ms apart). In AE it published one frame and then
@@ -266,10 +268,20 @@ static_assert(same(capped_size(3841, 100), {3840, 100}),   "one pixel over");
 static_assert(same(capped_size(100000, 1), {3840, 1}),     "never rounds to nothing");
 
 // What QueryVideoMode asks every instance for: {0, 0} until a frame over the
-// cap has been seen. Process-wide like the ring, because the reset that makes
-// the host ask again starts a new module.
+// cap has been seen, {0, 0} again when a new instance goes live. Process-wide
+// like the ring, because the reset that makes the host ask again starts a new
+// module.
 Size S_want {0, 0};
 bool S_reset_due = false;
+
+// A reset re-creates the host's instances under new ids, and they go live
+// before the new module's first frame; a user's switch to another comp also
+// arrives as a new instance going live, but after frames have flowed. The
+// count of frames since Startup tells the two apart. Focus loss and return
+// re-activate an instance already seen, which must not cost a full-size
+// frame: hence the set of ids that have been live.
+uint64_t S_frames_this_module = 0;
+std::set<csSDK_int32> S_been_live;
 
 // Replacing a mapping tells whoever holds the old one to let go first.
 void retire_ring(const char* why) {
@@ -334,6 +346,7 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
         acquire(P->sp, kPrSDKStringSuite, kPrSDKStringSuiteVersion, &P->str);
         if (P->time != nullptr) P->time->GetTicksPerSecond(&P->ticks_per_second);
         if (S.host.ring == nullptr) S.host = detect_host();
+        S_frames_this_module = 0;
         logf("startup in %s: ring %s, ticks/s %lld", S.host.label, S.host.ring,
              static_cast<long long>(P->ticks_per_second));
 
@@ -452,6 +465,15 @@ tmResult ActivateDeactivate(const tmStdParms*, const tmInstance* inst, PrActivat
     return guarded("ActivateDeactivate", [&] {
         if (videoActive) {
             S.video_on.insert(inst->inInstanceID);
+            // Another instance going live after frames have flowed is the
+            // user looking at something else: ask for its own size until
+            // its first frame says otherwise.
+            if (S_been_live.insert(inst->inInstanceID).second && S_want.w != 0
+                && S_frames_this_module > 0 && !S_reset_due) {
+                S_want = {0, 0};
+                S_reset_due = true;
+                logf("instance %d went live: back to the host's own size", inst->inInstanceID);
+            }
         } else {
             S.video_on.erase(inst->inInstanceID);
             S.last_pause = ev == PrActivationEvent_ApplicationLostFocus ? HostState::PausedFocus
@@ -520,6 +542,7 @@ void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
     // A frame over the cap: ask the host, through a module reset, to scale
     // from now on. Asked once per size, so a host that ignores the request
     // is not reset again; its frames keep saying "over the cap" below.
+    ++S_frames_this_module;
     const Size fit = capped_size(w, hgt);
     if (fit.w != 0 && !same(fit, S_want)) {
         S_want = fit;
