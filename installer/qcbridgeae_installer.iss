@@ -7,7 +7,7 @@
 ;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\qcbridgeae_installer.iss
 ; → dist\QCBridgeAE-<version>-Setup-x64.exe
 #define MyAppName "QCBridgeAE"
-#define MyAppVersion "0.2.1"
+#define MyAppVersion "0.2.2"
 #define MyAppPublisher "cbkow"
 #define MyAppURL "https://github.com/cbkow/QCBridgeAE"
 #define PluginFile "QCBridgeAE-Transmit.prm"

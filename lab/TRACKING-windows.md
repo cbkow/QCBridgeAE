@@ -917,6 +917,13 @@ decides when the coordinated release can happen.
   SDK". macOS is untouched too, so this is a shared piece of work, not a
   Windows-only one — but Adobe's plugin loading is stricter on Windows and
   worth checking early.
+- [x] **0.2.2: the UHD size cap, verified on Windows.** *Windows 2026-10-06:*
+  an 8000×8000 16 bpc comp went from ~0.6–1 fps through 0.2.1 to a steady
+  12.0 fps capped (5 ms per push); the probe at 2160²/1440²/1080²/64×64 all
+  gave 12.0 — the remaining half is AE's own loop on this box. The Windows
+  installer for 0.2.2 is built by `build-ae.cmd`; the `.prm` was installed by
+  copy, the installer itself still not run here.
+  `lab/results/2026-10-06-transmit-size-cap/`.
 - [x] **Where the plugin goes on Windows.** The macOS path is
   `/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/`. Confirm
   the Windows equivalent and whether it needs admin.

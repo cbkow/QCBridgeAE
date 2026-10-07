@@ -2,6 +2,16 @@
 
 **QCBridgeAE for After Effects and Premiere Pro** is a Mercury Transmit plugin that streams live viewport output from the the AE or Premiere to [QCView](https://qcview.app/). The output is unaltered and full float, converted to 1/2 float in QCView so the image quality is preserved under all circumstances, including HDR scenarios. See the [add-on](https://qcview.app/qcbridge/adobe/) page for more info.
 
+**Large comps.** A comp that fits inside 3840×2160 arrives pixel for pixel.
+A larger one is scaled by the host to fit inside 3840×2160 (aspect kept)
+before it is handed over: asked for at full size, an 8000×8000 comp is a
+977 MiB float frame per push built inside After Effects' playback loop, and
+playback drops to a few frames per second. In a **32 bpc project** After
+Effects spends ~65 ms per frame on any Transmit device whatever it asks for,
+so preview playback with the device enabled tops out around 9–12 fps there;
+16 bpc projects play in real time. Measurements:
+`lab/results/2026-10-06-transmit-size-cap/`.
+
 ## Building
 
 ```
