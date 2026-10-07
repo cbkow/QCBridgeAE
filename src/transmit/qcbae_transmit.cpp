@@ -246,13 +246,12 @@ constexpr Size capped_size(int32_t w, int32_t h) {
     if (w <= 0 || h <= 0 || (w <= kMaxWidth && h <= kMaxHeight)) return {0, 0};
     const int64_t W = w, H = h;
     // Whichever side reaches its limit first sets the scale; the other rounds
-    // to nearest and never to nothing.
-    if (W * kMaxHeight >= H * kMaxWidth) {
-        const auto oh = static_cast<int32_t>((H * kMaxWidth + W / 2) / W);
-        return {kMaxWidth, oh > 0 ? oh : 1};
-    }
-    const auto ow = static_cast<int32_t>((W * kMaxHeight + H / 2) / H);
-    return {ow > 0 ? ow : 1, kMaxHeight};
+    // to the nearest even number (the host has been seen to take 2160x2160,
+    // never an odd raster; half a pixel of aspect is nothing) and never to
+    // nothing.
+    const auto even = [](int64_t v) { const int32_t e = static_cast<int32_t>((v + 1) / 2 * 2); return e > 0 ? e : 2; };
+    if (W * kMaxHeight >= H * kMaxWidth) return {kMaxWidth, even((H * kMaxWidth + W / 2) / W)};
+    return {even((W * kMaxHeight + H / 2) / H), kMaxHeight};
 }
 constexpr bool same(Size a, Size b) { return a.w == b.w && a.h == b.h; }
 static_assert(same(capped_size(3840, 2160), {0, 0}),       "what fits is not touched");
@@ -263,9 +262,11 @@ static_assert(same(capped_size(7680, 4320), {3840, 2160}), "8K UHD");
 static_assert(same(capped_size(6720, 3780), {3840, 2160}), "16:9 above the cap");
 static_assert(same(capped_size(8000, 8000), {2160, 2160}), "square: height limits");
 static_assert(same(capped_size(9216, 3164), {3840, 1318}), "wide: width limits");
-static_assert(same(capped_size(2160, 3840), {1215, 2160}), "portrait");
+static_assert(same(capped_size(2160, 3840), {1216, 2160}), "portrait, rounded to even");
+static_assert(same(capped_size(4000, 5000), {1728, 2160}), "4:5 portrait");
+static_assert(same(capped_size(3000, 8000), {810, 2160}),  "tall");
 static_assert(same(capped_size(3841, 100), {3840, 100}),   "one pixel over");
-static_assert(same(capped_size(100000, 1), {3840, 1}),     "never rounds to nothing");
+static_assert(same(capped_size(100000, 1), {3840, 2}),     "never rounds to nothing");
 
 // What QueryVideoMode asks every instance for: {0, 0} until a frame over the
 // cap has been seen, {0, 0} again when a new instance goes live. Process-wide
