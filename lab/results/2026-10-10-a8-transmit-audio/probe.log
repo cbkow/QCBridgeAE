@@ -1,0 +1,208 @@
+[08:15:22] --- module load, host interface v4 ---
+[08:15:22] startup: audio push (pull 0, push 1), clock 0, streaming 0, push_samples 1024, mode 2 ch @ 48000 Hz
+[08:15:22] startup: interface v4, 3 mode(s) configured, colour space 'Working Color Space', ticks/s 254016000000
+[08:18:17] instance 46551: video 1, 1280x720, PAR 1:1, 25.000 fps, field 0, timeline 1, play 1; audio 1, 2 ch, sample type 6, 48000 Hz
+[08:18:17] QueryAudioMode instance 46551 #0: host says audio 1, 2 ch, sample type 6, 48000 Hz, play 1; offering 2 ch @ 48000 Hz, latency 0 frame(s)
+[08:18:17] QueryVideoMode instance 46551 #0: offer bgra8 (bgra), host prefilled colour type 0, colour space Working Color Space
+[08:18:17] QueryVideoMode instance 46551 #1: offer argb8 (argb), host prefilled colour type 0, colour space Working Color Space
+[08:18:17] QueryVideoMode instance 46551 #2: offer bgra32f (BGra), host prefilled colour type 0, colour space Working Color Space
+[08:18:17] instance 46551: activation event 0, audio 0, video 1
+[08:18:17] frame 1 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 0, mode 0, quality 3, render 0 ms
+[08:18:17] ring created for 1280x720
+[08:18:17] frame 2 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 0, mode 0, quality 3, render 0 ms
+[08:18:17] frame 3 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 0, mode 0, quality 3, render 0 ms
+[08:18:17] frame 4 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 0, mode 0, quality 3, render 0 ms
+[08:18:17] frame 5 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 0, mode 0, quality 3, render 0 ms
+[08:18:31] BURST ended instance 46551: 5 frames of bgra32f 1280x720 in 0.27 s = 14.72 fps; interval mean 67.94 max 219.46 ms; copy mean 0.663 max 1.170 ms; host render mean 0.00 ms
+[08:18:32] frame 7 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 0, mode 1, quality 1, render 0 ms
+[08:18:32] ring created for 640x360
+[08:18:35] frame 100 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 944939520000, mode 1, quality 1, render 0 ms
+[08:18:39] frame 200 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 1961003520000, mode 1, quality 1, render 0 ms
+[08:18:40] BURST ended instance 46551: 204 frames of bgra32f 640x360 in 8.12 s = 25.00 fps; interval mean 40.00 max 61.49 ms; copy mean 0.112 max 0.447 ms; host render mean 0.00 ms
+[08:18:40] frame 211 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 2062609920000, mode 0, quality 3, render 0 ms
+[08:18:40] ring created for 1280x720
+[08:20:30] BURST ended instance 46551: 9 frames of bgra32f 1280x720 in 0.23 s = 34.23 fps; interval mean 29.22 max 49.56 ms; copy mean 0.340 max 0.463 ms; host render mean 0.00 ms
+[08:20:32] BURST ended instance 46551: 2 frames of bgra32f 1280x720 in 0.25 s = 3.97 fps; interval mean 252.12 max 252.12 ms; copy mean 0.585 max 0.912 ms; host render mean 0.00 ms
+[08:20:32] StartPushAudio instance 46551: start 2062609920000 (8.120 s), speed 1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 1024 samples per push
+[08:20:32] frame 223 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 2062609920000, mode 1, quality 1, render 0 ms
+[08:20:32] ring created for 640x360
+[08:20:32] PushAudio #1 instance 46551: 1024 samples x 2 ch, time 2062609940480 (8.120 s), video 8.120 s (+0.0 ms, 23 ms ago), peak 0.089, interval 0.00 ms
+[08:20:32] PushAudio #2 instance 46551: 1024 samples x 2 ch, time 2068028850176 (8.141 s), video 8.120 s (+21.3 ms, 44 ms ago), peak 0.088, interval 21.30 ms GAP (not contiguous with the previous push)
+[08:20:32] PushAudio #3 instance 46551: 1024 samples x 2 ch, time 2073447890944 (8.163 s), video 8.160 s (+2.7 ms, 17 ms ago), peak 0.088, interval 21.40 ms GAP (not contiguous with the previous push)
+[08:20:32] PushAudio #4 instance 46551: 1024 samples x 2 ch, time 2078866931712 (8.184 s), video 8.160 s (+24.0 ms, 38 ms ago), peak 0.088, interval 21.30 ms GAP (not contiguous with the previous push)
+[08:20:32] PushAudio #5 instance 46551: 1024 samples x 2 ch, time 2084285841408 (8.205 s), video 8.200 s (+5.3 ms, 8 ms ago), peak 0.088, interval 21.33 ms GAP (not contiguous with the previous push)
+[08:20:32] PushAudio #6 instance 46551: 1024 samples x 2 ch, time 2089704882176 (8.227 s), video 8.200 s (+26.7 ms, 29 ms ago), peak 0.088, interval 21.30 ms GAP (not contiguous with the previous push)
+[08:20:35] frame 300 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 2844979200000, mode 1, quality 1, render 0 ms
+[08:20:36] PushAudio #201 instance 46551: 1024 samples x 2 ch, time 3146411409408 (12.387 s), video 12.400 s (-13.3 ms, 8 ms ago), peak 0.088, interval 21.32 ms GAP (not contiguous with the previous push)
+[08:20:39] frame 400 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 3861043200000, mode 1, quality 1, render 0 ms
+[08:20:40] StopPushAudio instance 46551: 382 pushes, 391168 samples x 2 ch = 8.149 s of audio at 48000 Hz over 8.129 s wall (8.120 s .. 16.248 s timeline), 1024..1024 samples per push, interval mean 21.33 max 21.47 ms, 381 gaps, 0 silent pushes, peak 0.089
+[08:20:40] BURST ended instance 46551: 204 frames of bgra32f 640x360 in 8.13 s = 24.98 fps; interval mean 40.03 max 58.92 ms; copy mean 0.098 max 0.162 ms; host render mean 0.00 ms
+[08:20:40] frame 427 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 4125219840000, mode 0, quality 3, render 0 ms
+[08:20:40] ring created for 1280x720
+[08:21:41] StartPushAudio instance 46551: start 4125219840000 (16.240 s), speed 1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 1024 samples per push
+[08:21:41] BURST ended instance 46551: 9 frames of bgra32f 1280x720 in 0.24 s = 33.19 fps; interval mean 30.13 max 47.20 ms; copy mean 0.338 max 0.521 ms; host render mean 0.00 ms
+[08:21:41] frame 437 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 4125219840000, mode 1, quality 1, render 0 ms
+[08:21:41] ring created for 640x360
+[08:21:41] PushAudio #1 instance 46551: 1024 samples x 2 ch, time 4125219880960 (16.240 s), video 16.240 s (+0.0 ms, 22 ms ago), peak 0.088, interval 0.00 ms
+[08:21:41] PushAudio #2 instance 46551: 1024 samples x 2 ch, time 4130638921728 (16.261 s), video 16.240 s (+21.3 ms, 43 ms ago), peak 0.088, interval 21.30 ms GAP (not contiguous with the previous push)
+[08:21:41] PushAudio #3 instance 46551: 1024 samples x 2 ch, time 4136057700352 (16.283 s), video 16.280 s (+2.7 ms, 8 ms ago), peak 0.088, interval 21.39 ms GAP (not contiguous with the previous push)
+[08:21:41] PushAudio #4 instance 46551: 1024 samples x 2 ch, time 4141477003264 (16.304 s), video 16.280 s (+24.0 ms, 30 ms ago), peak 0.088, interval 21.32 ms GAP (not contiguous with the previous push)
+[08:21:41] PushAudio #5 instance 46551: 1024 samples x 2 ch, time 4146895781888 (16.325 s), video 16.320 s (+5.3 ms, 12 ms ago), peak 0.088, interval 21.32 ms GAP (not contiguous with the previous push)
+[08:21:41] PushAudio #6 instance 46551: 1024 samples x 2 ch, time 4152315084800 (16.347 s), video 16.320 s (+26.7 ms, 33 ms ago), peak 0.088, interval 21.32 ms GAP (not contiguous with the previous push)
+[08:21:43] frame 500 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 4765340160000, mode 1, quality 1, render 0 ms
+[08:21:44] BURST ended instance 46551: 94 frames of bgra32f 640x360 in 2.71 s = 34.28 fps; interval mean 29.17 max 59.66 ms; copy mean 0.096 max 0.220 ms; host render mean 0.00 ms
+[08:21:44] frame 531 instance 46551: bgra32f (BGra), 1x1, rowbytes 64, time 5080320000000, mode 1, quality 1, render 0 ms
+[08:21:44] ring created for 1x1
+[08:21:44] StopPushAudio instance 46551: 125 pushes, 128000 samples x 2 ch = 2.667 s of audio at 48000 Hz over 2.711 s wall (16.240 s .. 18.885 s timeline), 1024..1024 samples per push, interval mean 21.34 max 22.28 ms, 124 gaps, 5 silent pushes, peak 0.089
+[08:21:48] BURST ended instance 46551: 18 frames of bgra32f 1x1 in 0.27 s = 63.00 fps; interval mean 15.87 max 34.43 ms; copy mean 0.002 max 0.007 ms; host render mean 0.00 ms
+[08:21:48] StartPushAudio instance 46551: start 5080320000000 (20.000 s), speed -1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 1024 samples per push
+[08:21:48] PushAudio #1 instance 46551: 1024 samples x 2 ch, time 5080319787008 (20.000 s), video 20.000 s (-0.0 ms, 13 ms ago), peak 0.089, interval 0.00 ms
+[08:21:48] BURST ended instance 46551: 2 frames of bgra32f 1x1 in 0.00 s = 223.11 fps; interval mean 4.48 max 4.48 ms; copy mean 0.000 max 0.000 ms; host render mean 0.00 ms
+[08:21:48] frame 551 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 5070159360000, mode 1, quality 1, render 0 ms
+[08:21:48] ring created for 640x360
+[08:21:48] PushAudio #2 instance 46551: 1024 samples x 2 ch, time 5074901270528 (19.979 s), video 19.960 s (+18.7 ms, 8 ms ago), peak 0.089, interval 21.37 ms GAP (not contiguous with the previous push)
+[08:21:48] PushAudio #3 instance 46551: 1024 samples x 2 ch, time 5069482229760 (19.957 s), video 19.920 s (+37.3 ms, 6 ms ago), peak 0.088, interval 21.27 ms GAP (not contiguous with the previous push)
+[08:21:48] PushAudio #4 instance 46551: 1024 samples x 2 ch, time 5064063188992 (19.936 s), video 19.920 s (+16.0 ms, 27 ms ago), peak 0.088, interval 21.34 ms GAP (not contiguous with the previous push)
+[08:21:48] PushAudio #5 instance 46551: 1024 samples x 2 ch, time 5058644148224 (19.915 s), video 19.880 s (+34.7 ms, 14 ms ago), peak 0.089, interval 21.36 ms GAP (not contiguous with the previous push)
+[08:21:48] PushAudio #6 instance 46551: 1024 samples x 2 ch, time 5053224583168 (19.893 s), video 19.880 s (+13.3 ms, 35 ms ago), peak 0.088, interval 21.35 ms GAP (not contiguous with the previous push)
+[08:21:50] frame 600 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 4572288000000, mode 1, quality 1, render 0 ms
+[08:21:51] StopPushAudio instance 46551: 148 pushes, 151552 samples x 2 ch = 3.157 s of audio at 48000 Hz over 3.138 s wall (20.000 s .. 16.864 s timeline), 1024..1024 samples per push, interval mean 21.33 max 21.48 ms, 147 gaps, 0 silent pushes, peak 0.089
+[08:21:51] BURST ended instance 46551: 78 frames of bgra32f 640x360 in 3.08 s = 25.01 fps; interval mean 39.99 max 64.54 ms; copy mean 0.106 max 0.226 ms; host render mean 0.00 ms
+[08:21:51] frame 629 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 4287790080000, mode 0, quality 3, render 0 ms
+[08:21:51] ring created for 1280x720
+[08:21:53] BURST ended instance 46551: 10 frames of bgra32f 1280x720 in 0.25 s = 36.10 fps; interval mean 27.70 max 49.79 ms; copy mean 0.455 max 0.887 ms; host render mean 0.00 ms
+[08:21:53] StartPushAudio instance 46551: start 4287790080000 (16.880 s), speed -1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 1024 samples per push
+[08:21:53] frame 640 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 4287790080000, mode 1, quality 1, render 0 ms
+[08:21:53] ring created for 640x360
+[08:21:53] PushAudio #1 instance 46551: 1024 samples x 2 ch, time 4287790055424 (16.880 s), video 16.880 s (-0.0 ms, 12 ms ago), peak 0.088, interval 0.00 ms
+[08:21:53] PushAudio #2 instance 46551: 1024 samples x 2 ch, time 4282371276800 (16.859 s), video 16.840 s (+18.7 ms, 6 ms ago), peak 0.088, interval 21.33 ms GAP (not contiguous with the previous push)
+[08:21:53] PushAudio #3 instance 46551: 1024 samples x 2 ch, time 4276951973888 (16.837 s), video 16.840 s (-2.7 ms, 28 ms ago), peak 0.088, interval 21.31 ms GAP (not contiguous with the previous push)
+[08:21:53] PushAudio #4 instance 46551: 1024 samples x 2 ch, time 4271532933120 (16.816 s), video 16.800 s (+16.0 ms, 21 ms ago), peak 0.088, interval 21.64 ms GAP (not contiguous with the previous push)
+[08:21:53] PushAudio #5 instance 46551: 1024 samples x 2 ch, time 4266114154496 (16.795 s), video 16.760 s (+34.7 ms, 19 ms ago), peak 0.000, interval 21.45 ms GAP (not contiguous with the previous push)
+[08:21:53] PushAudio #6 instance 46551: 1024 samples x 2 ch, time 4260694851584 (16.773 s), video 16.680 s (+93.3 ms, 3 ms ago), peak 0.000, interval 21.79 ms GAP (not contiguous with the previous push)
+[08:21:54] frame 700 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 3678151680000, mode 1, quality 1, render 0 ms
+[08:21:55] StopPushAudio instance 46551: 105 pushes, 107520 samples x 2 ch = 2.240 s of audio at 48000 Hz over 2.221 s wall (16.880 s .. 14.661 s timeline), 1024..1024 samples per push, interval mean 21.34 max 22.39 ms, 104 gaps, 5 silent pushes, peak 0.088
+[08:21:55] BURST ended instance 46551: 106 frames of bgra32f 640x360 in 2.21 s = 47.48 fps; interval mean 21.06 max 53.93 ms; copy mean 0.088 max 0.125 ms; host render mean 0.00 ms
+[08:21:55] frame 746 instance 46551: bgra32f (BGra), 1280x720, rowbytes 20480, time 3170119680000, mode 0, quality 3, render 0 ms
+[08:21:55] ring created for 1280x720
+[08:22:03] BURST ended instance 46551: 13 frames of bgra32f 1280x720 in 0.25 s = 48.96 fps; interval mean 20.42 max 37.17 ms; copy mean 0.430 max 0.714 ms; host render mean 0.00 ms
+[08:22:03] config changed: requesting module reset
+[08:22:03] startup: audio push (pull 0, push 1), clock 0, streaming 0, push_samples 2048, mode 2 ch @ 48000 Hz
+[08:22:03] startup: interface v4, 3 mode(s) configured, colour space 'Working Color Space', ticks/s 254016000000
+[08:22:03] StartPushAudio instance 46551: start 3170119680000 (12.480 s), speed 1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 1024 samples per push
+[08:22:03] frame 760 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 3170119680000, mode 1, quality 1, render 0 ms
+[08:22:03] ring created for 640x360
+[08:22:03] PushAudio #1 instance 46551: 1024 samples x 2 ch, time 3170119712768 (12.480 s), video 12.480 s (+0.0 ms, 21 ms ago), peak 0.088, interval 0.00 ms
+[08:22:03] PushAudio #2 instance 46551: 1024 samples x 2 ch, time 3175538753536 (12.501 s), video 12.480 s (+21.3 ms, 42 ms ago), peak 0.088, interval 21.28 ms GAP (not contiguous with the previous push)
+[08:22:03] PushAudio #3 instance 46551: 1024 samples x 2 ch, time 3180957532160 (12.523 s), video 12.520 s (+2.7 ms, 19 ms ago), peak 0.088, interval 21.41 ms GAP (not contiguous with the previous push)
+[08:22:03] PushAudio #4 instance 46551: 1024 samples x 2 ch, time 3186376835072 (12.544 s), video 12.520 s (+24.0 ms, 40 ms ago), peak 0.088, interval 21.30 ms GAP (not contiguous with the previous push)
+[08:22:03] PushAudio #5 instance 46551: 1024 samples x 2 ch, time 3191795613696 (12.565 s), video 12.560 s (+5.3 ms, 8 ms ago), peak 0.088, interval 21.31 ms GAP (not contiguous with the previous push)
+[08:22:03] PushAudio #6 instance 46551: 1024 samples x 2 ch, time 3197214916608 (12.587 s), video 12.560 s (+26.7 ms, 29 ms ago), peak 0.088, interval 21.32 ms GAP (not contiguous with the previous push)
+[08:22:05] frame 800 instance 46551: bgra32f (BGra), 640x360, rowbytes 10240, time 3576545280000, mode 1, quality 1, render 0 ms
+[08:22:05] instance 46551: activation event 0, audio 0, video 0
+[08:22:05] instance 49734: video 1, 1280x720, PAR 1:1, 25.000 fps, field 0, timeline 1, play 1; audio 1, 2 ch, sample type 6, 48000 Hz
+[08:22:05] QueryAudioMode instance 49734 #0: host says audio 1, 2 ch, sample type 6, 48000 Hz, play 1; offering 2 ch @ 48000 Hz, latency 0 frame(s)
+[08:22:05] QueryVideoMode instance 49734 #0: offer bgra8 (bgra), host prefilled colour type 0, colour space Working Color Space
+[08:22:05] QueryVideoMode instance 49734 #1: offer argb8 (argb), host prefilled colour type 0, colour space Working Color Space
+[08:22:05] QueryVideoMode instance 49734 #2: offer bgra32f (BGra), host prefilled colour type 0, colour space Working Color Space
+[08:22:05] instance 49734: activation event 0, audio 0, video 1
+[08:22:05] frame 1 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 3678151680000, mode 1, quality 1, render 0 ms
+[08:22:05] frame 2 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 3688312320000, mode 1, quality 1, render 0 ms
+[08:22:05] frame 3 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 3698472960000, mode 1, quality 1, render 0 ms
+[08:22:05] frame 4 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 3708633600000, mode 1, quality 1, render 0 ms
+[08:22:05] frame 5 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 3718794240000, mode 1, quality 1, render 0 ms
+[08:22:06] StopPushAudio instance 46551: 147 pushes, 150528 samples x 2 ch = 3.136 s of audio at 48000 Hz over 3.126 s wall (12.480 s .. 15.595 s timeline), 1024..1024 samples per push, interval mean 21.33 max 21.51 ms, 146 gaps, 0 silent pushes, peak 0.089
+[08:22:06] BURST disposed instance 46551: 51 frames of bgra32f 640x360 in 2.01 s = 24.87 fps; interval mean 40.22 max 58.33 ms; copy mean 0.104 max 0.181 ms; host render mean 0.00 ms
+[08:22:06] instance 46551 disposed after 810 frames (stopped 71, playing 739, scrubbing 0)
+[08:22:06] shutdown
+[08:22:06] BURST ended instance 49734: 29 frames of bgra32f 640x360 in 1.11 s = 25.21 fps; interval mean 39.67 max 58.81 ms; copy mean 0.114 max 0.366 ms; host render mean 0.00 ms
+[08:22:06] frame 30 instance 49734: bgra32f (BGra), 1280x720, rowbytes 20480, time 3962649600000, mode 0, quality 3, render 0 ms
+[08:22:06] ring created for 1280x720
+[08:22:55] StartPushAudio instance 49734: start 3962649600000 (15.600 s), speed 1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 2048 samples per push
+[08:22:55] BURST ended instance 49734: 11 frames of bgra32f 1280x720 in 0.25 s = 39.68 fps; interval mean 25.20 max 43.86 ms; copy mean 0.442 max 0.800 ms; host render mean 0.00 ms
+[08:22:55] frame 42 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 3962649600000, mode 1, quality 1, render 0 ms
+[08:22:55] ring created for 640x360
+[08:22:55] PushAudio #1 instance 49734: 2048 samples x 2 ch, time 3962649444352 (15.600 s), video 15.600 s (-0.0 ms, 35 ms ago), peak 0.088, interval 0.00 ms
+[08:22:56] PushAudio #2 instance 49734: 2048 samples x 2 ch, time 3973487525888 (15.643 s), video 15.640 s (+2.7 ms, 21 ms ago), peak 0.089, interval 42.67 ms GAP (not contiguous with the previous push)
+[08:22:56] PushAudio #3 instance 49734: 2048 samples x 2 ch, time 3984325607424 (15.685 s), video 15.680 s (+5.3 ms, 31 ms ago), peak 0.088, interval 42.74 ms GAP (not contiguous with the previous push)
+[08:22:56] PushAudio #4 instance 49734: 2048 samples x 2 ch, time 3995163426816 (15.728 s), video 15.720 s (+8.0 ms, 36 ms ago), peak 0.088, interval 42.62 ms GAP (not contiguous with the previous push)
+[08:22:56] PushAudio #5 instance 49734: 2048 samples x 2 ch, time 4006001508352 (15.771 s), video 15.760 s (+10.7 ms, 34 ms ago), peak 0.088, interval 42.64 ms GAP (not contiguous with the previous push)
+[08:22:56] PushAudio #6 instance 49734: 2048 samples x 2 ch, time 4016839589888 (15.813 s), video 15.800 s (+13.3 ms, 28 ms ago), peak 0.088, interval 42.69 ms GAP (not contiguous with the previous push)
+[08:22:58] frame 100 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 4551966720000, mode 1, quality 1, render 0 ms
+[08:22:59] StopPushAudio instance 49734: 74 pushes, 151552 samples x 2 ch = 3.157 s of audio at 48000 Hz over 3.116 s wall (15.600 s .. 18.715 s timeline), 2048..2048 samples per push, interval mean 42.67 max 42.78 ms, 73 gaps, 0 silent pushes, peak 0.089
+[08:22:59] BURST ended instance 49734: 79 frames of bgra32f 640x360 in 3.14 s = 24.85 fps; interval mean 40.25 max 56.93 ms; copy mean 0.101 max 0.241 ms; host render mean 0.00 ms
+[08:22:59] frame 121 instance 49734: bgra32f (BGra), 1280x720, rowbytes 20480, time 4755179520000, mode 0, quality 3, render 0 ms
+[08:22:59] ring created for 1280x720
+[08:23:00] StartPushAudio instance 49734: start 4755179520000 (18.720 s), speed 1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 2048 samples per push
+[08:23:00] BURST ended instance 49734: 8 frames of bgra32f 1280x720 in 0.24 s = 28.59 fps; interval mean 34.98 max 49.49 ms; copy mean 0.344 max 0.469 ms; host render mean 0.00 ms
+[08:23:00] frame 130 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 4755179520000, mode 1, quality 1, render 0 ms
+[08:23:00] ring created for 640x360
+[08:23:00] PushAudio #1 instance 49734: 2048 samples x 2 ch, time 4755179438080 (18.720 s), video 18.720 s (-0.0 ms, 42 ms ago), peak 0.088, interval 0.00 ms
+[08:23:00] PushAudio #2 instance 49734: 2048 samples x 2 ch, time 4766017519616 (18.763 s), video 18.760 s (+2.7 ms, 26 ms ago), peak 0.088, interval 42.69 ms GAP (not contiguous with the previous push)
+[08:23:00] PushAudio #3 instance 49734: 2048 samples x 2 ch, time 4776855601152 (18.805 s), video 18.800 s (+5.3 ms, 37 ms ago), peak 0.088, interval 42.69 ms GAP (not contiguous with the previous push)
+[08:23:00] PushAudio #4 instance 49734: 2048 samples x 2 ch, time 4787693682688 (18.848 s), video 18.840 s (+8.0 ms, 33 ms ago), peak 0.089, interval 42.68 ms GAP (not contiguous with the previous push)
+[08:23:00] PushAudio #5 instance 49734: 2048 samples x 2 ch, time 4798531239936 (18.891 s), video 18.880 s (+10.7 ms, 38 ms ago), peak 0.088, interval 42.64 ms GAP (not contiguous with the previous push)
+[08:23:01] PushAudio #6 instance 49734: 2048 samples x 2 ch, time 4809369321472 (18.933 s), video 18.920 s (+13.3 ms, 42 ms ago), peak 0.088, interval 42.65 ms GAP (not contiguous with the previous push)
+[08:23:01] BURST ended instance 49734: 32 frames of bgra32f 640x360 in 0.82 s = 37.93 fps; interval mean 26.36 max 58.27 ms; copy mean 0.083 max 0.124 ms; host render mean 0.00 ms
+[08:23:01] frame 162 instance 49734: bgra32f (BGra), 1x1, rowbytes 64, time 5080320000000, mode 1, quality 1, render 0 ms
+[08:23:01] ring created for 1x1
+[08:23:01] StopPushAudio instance 49734: 19 pushes, 38912 samples x 2 ch = 0.811 s of audio at 48000 Hz over 0.801 s wall (18.720 s .. 19.488 s timeline), 2048..2048 samples per push, interval mean 42.71 max 43.61 ms, 18 gaps, 2 silent pushes, peak 0.089
+[08:23:07] BURST ended instance 49734: 18 frames of bgra32f 1x1 in 0.26 s = 64.39 fps; interval mean 15.53 max 33.38 ms; copy mean 0.000 max 0.000 ms; host render mean 0.00 ms
+[08:23:07] StartPushAudio instance 49734: start 0 (0.000 s), speed 1.00, in 0.000, out 20.000, loop 0, scrubbing 0, host audio 1 2 ch type 6 48000 Hz, play 1; asked 2048 samples per push
+[08:23:07] frame 181 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 0, mode 1, quality 1, render 0 ms
+[08:23:07] ring created for 640x360
+[08:23:07] PushAudio #1 instance 49734: 2048 samples x 2 ch, time 0 (0.000 s), video 0.000 s (+0.0 ms, 21 ms ago), peak 0.092, interval 0.00 ms
+[08:23:07] PushAudio #2 instance 49734: 2048 samples x 2 ch, time 10838016000 (0.043 s), video 0.040 s (+2.7 ms, 18 ms ago), peak 0.088, interval 42.66 ms
+[08:23:07] PushAudio #3 instance 49734: 2048 samples x 2 ch, time 21676032000 (0.085 s), video 0.080 s (+5.3 ms, 24 ms ago), peak 0.089, interval 42.65 ms
+[08:23:07] PushAudio #4 instance 49734: 2048 samples x 2 ch, time 32514048000 (0.128 s), video 0.120 s (+8.0 ms, 26 ms ago), peak 0.088, interval 42.71 ms
+[08:23:07] PushAudio #5 instance 49734: 2048 samples x 2 ch, time 43352064000 (0.171 s), video 0.160 s (+10.7 ms, 32 ms ago), peak 0.088, interval 42.64 ms
+[08:23:07] PushAudio #6 instance 49734: 2048 samples x 2 ch, time 54190075904 (0.213 s), video 0.240 s (-26.7 ms, 0 ms ago), peak 0.088, interval 42.75 ms GAP (not contiguous with the previous push)
+[08:23:07] PushAudio #7 instance 49734: 2048 samples x 2 ch, time 65028096000 (0.256 s), video 0.280 s (-24.0 ms, 7 ms ago), peak 0.088, interval 42.64 ms GAP (not contiguous with the previous push)
+[08:23:07] PushAudio #11 instance 49734: 2048 samples x 2 ch, time 108380151808 (0.427 s), video 0.440 s (-13.3 ms, 12 ms ago), peak 0.088, interval 42.73 ms GAP (not contiguous with the previous push)
+[08:23:08] PushAudio #12 instance 49734: 2048 samples x 2 ch, time 119218184192 (0.469 s), video 0.480 s (-10.7 ms, 19 ms ago), peak 0.088, interval 42.61 ms GAP (not contiguous with the previous push)
+[08:23:08] PushAudio #13 instance 49734: 2048 samples x 2 ch, time 130056192000 (0.512 s), video 0.520 s (-8.0 ms, 16 ms ago), peak 0.088, interval 42.62 ms GAP (not contiguous with the previous push)
+[08:23:08] frame 200 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 193052160000, mode 1, quality 1, render 0 ms
+[08:23:12] frame 300 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 1209116160000, mode 1, quality 1, render 0 ms
+[08:23:16] PushAudio #201 instance 49734: 2048 samples x 2 ch, time 2167603200000 (8.533 s), video 8.520 s (+13.3 ms, 31 ms ago), peak 0.088, interval 42.62 ms GAP (not contiguous with the previous push)
+[08:23:16] frame 400 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 2225180160000, mode 1, quality 1, render 0 ms
+[08:23:16] StopPushAudio instance 49734: 214 pushes, 438272 samples x 2 ch = 9.131 s of audio at 48000 Hz over 9.089 s wall (0.000 s .. 9.088 s timeline), 2048..2048 samples per push, interval mean 42.67 max 42.84 ms, 143 gaps, 0 silent pushes, peak 0.092
+[08:23:16] BURST ended instance 49734: 228 frames of bgra32f 640x360 in 9.09 s = 24.97 fps; interval mean 40.05 max 61.46 ms; copy mean 0.098 max 0.162 ms; host render mean 0.00 ms
+[08:23:16] frame 409 instance 49734: bgra32f (BGra), 1280x720, rowbytes 20480, time 2306465280000, mode 0, quality 3, render 0 ms
+[08:23:16] ring created for 1280x720
+[08:23:49] StartPushAudio instance 49734: start 518192640000 (2.040 s), speed 1.00, in 2.040, out 2.080, loop 0, scrubbing 1, host audio 1 2 ch type 6 48000 Hz, play 1; asked 2048 samples per push
+[08:23:49] BURST ended instance 49734: 10 frames of bgra32f 1280x720 in 0.24 s = 37.74 fps; interval mean 26.50 max 53.78 ms; copy mean 0.333 max 0.479 ms; host render mean 0.00 ms
+[08:23:49] frame 419 instance 49734: bgra32f (BGra), 640x360, rowbytes 10240, time 518192640000, mode 2, quality 1, render 0 ms
+[08:23:49] ring created for 640x360
+[08:23:49] PushAudio #1 instance 49734: 2048 samples x 2 ch, time 518192627712 (2.040 s), video 2.040 s (-0.0 ms, 35 ms ago), peak 0.088, interval 0.00 ms
+[08:23:53] StopPushAudio instance 49734: 1 pushes, 2048 samples x 2 ch = 0.043 s of audio at 48000 Hz over 3.730 s wall (2.040 s .. 2.040 s timeline), 2048..2048 samples per push, interval mean 0.00 max 0.00 ms, 0 gaps, 0 silent pushes, peak 0.088
+[08:23:53] BURST ended instance 49734: 2 frames of bgra32f 640x360 in 0.24 s = 4.08 fps; interval mean 244.93 max 244.93 ms; copy mean 0.144 max 0.192 ms; host render mean 0.00 ms
+[08:23:53] frame 421 instance 49734: bgra32f (BGra), 1280x720, rowbytes 20480, time 518192640000, mode 0, quality 3, render 0 ms
+[08:23:53] ring created for 1280x720
+[08:24:18] BURST ended instance 49734: 4 frames of bgra32f 1280x720 in 0.26 s = 11.64 fps; interval mean 85.93 max 232.01 ms; copy mean 0.663 max 1.534 ms; host render mean 0.00 ms
+[08:24:21] instance 49734: activation event 0, audio 0, video 0
+=== AE LAUNCH 08:24:29 ===
+[08:24:31] --- module load, host interface v4 ---
+[08:24:31] startup: audio both (pull 1, push 1), clock 1, streaming 0, push_samples 1024, mode 2 ch @ 48000 Hz
+[08:24:31] startup: interface v4, 3 mode(s) configured, colour space 'Working Color Space', ticks/s 254016000000
+[08:25:38] instance 8: video 1, 720x480, PAR 1:1, 30.000 fps, field 0, timeline 0, play 0; audio 0, 0 ch, sample type 0, 0 Hz
+[08:25:38] QueryVideoMode instance 8 #0: offer bgra8 (bgra), host prefilled colour type 0, colour space Working Color Space
+[08:25:38] QueryVideoMode instance 8 #1: offer argb8 (argb), host prefilled colour type 0, colour space Working Color Space
+[08:25:38] QueryVideoMode instance 8 #2: offer bgra32f (BGra), host prefilled colour type 0, colour space Working Color Space
+[08:25:38] instance 8: activation event 2, audio 0, video 1
+[08:25:38] instance 8: activation event 0, audio 0, video 0
+[08:25:38] instance 12: video 1, 1280x720, PAR 1:1, 25.000 fps, field 0, timeline 0, play 0; audio 0, 0 ch, sample type 0, 0 Hz
+[08:25:38] QueryVideoMode instance 12 #0: offer bgra8 (bgra), host prefilled colour type 0, colour space Working Color Space
+[08:25:38] QueryVideoMode instance 12 #1: offer argb8 (argb), host prefilled colour type 0, colour space Working Color Space
+[08:25:38] QueryVideoMode instance 12 #2: offer bgra32f (BGra), host prefilled colour type 0, colour space Working Color Space
+[08:25:38] instance 12: activation event 2, audio 0, video 1
+[08:25:38] instance 8 disposed after 0 frames (stopped 0, playing 0, scrubbing 0)
+[08:25:38] frame 1 instance 12: bgra32f (BGra), 1280x720, rowbytes 20480, time -1, mode 2, quality 1, render 0 ms
+[08:25:38] ring created for 1280x720
+[08:25:45] frame 2 instance 12: bgra32f (BGra), 1280x720, rowbytes 20480, time -1, mode 2, quality 1, render 0 ms
+[08:25:45] frame 3 instance 12: bgra32f (BGra), 1280x720, rowbytes 20480, time -1, mode 2, quality 1, render 0 ms
+[08:25:45] frame 4 instance 12: bgra32f (BGra), 1280x720, rowbytes 20480, time -1, mode 2, quality 1, render 0 ms
+[08:25:45] frame 5 instance 12: bgra32f (BGra), 1280x720, rowbytes 20480, time -1, mode 2, quality 1, render 0 ms
+[08:25:49] frame 100 instance 12: bgra32f (BGra), 1280x720, rowbytes 20480, time -1, mode 2, quality 1, render 0 ms
+[08:25:53] frame 200 instance 12: bgra32f (BGra), 1280x720, rowbytes 20480, time -1, mode 2, quality 1, render 0 ms
+[08:25:54] BURST window instance 12: 240 frames of bgra32f 1280x720 in 9.56 s = 25.00 fps; interval mean 40.01 max 50.42 ms; copy mean 1.434 max 2.179 ms; host render mean 0.00 ms
+[08:26:28] instance 12: activation event 3, audio 0, video 0

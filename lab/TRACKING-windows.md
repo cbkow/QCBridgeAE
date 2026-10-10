@@ -958,7 +958,15 @@ decides when the coordinated release can happen.
 Each will need a D3D11 twin when it lands on macOS. Nothing is queued here
 right now — dual live landed on 2026-09-22 and has its own section above.
 
-- *(empty)*
+- [ ] **QCBridgeAE A8 — Premiere push audio, re-measure on Windows (added
+  2026-10-10).** The Mac probe showed Premiere pushes planar float audio to
+  a push-only Transmit device once "Audio Stream" is ticked in Playback
+  preferences, with no clock of ours (`lab/results/2026-10-10-a8-transmit-audio/`).
+  The probe `.prm` builds from the same source; when Premiere is on the
+  box, run it with `audio = push` in `%TEMP%\qcbridgeae-transmit.conf`,
+  tick the box, play, and compare the `StopPushAudio` summary (size,
+  cadence, gaps). After Effects is video-only on the Mac; one AE run to
+  confirm the same there is enough.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
