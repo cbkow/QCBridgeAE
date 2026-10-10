@@ -41,6 +41,16 @@
 //     nothing: removing it alone brought AE back to 24 fps at 4K (A6 notes),
 //     so the key does not identify content there. An unmeasured saving must
 //     not be able to drop frames without a trace.
+//   * Audio is a "mirror" (push) device only, never the host's primary audio
+//     device or its clock (DESIGN-NOTES D6; lab/results/2026-10-10-a8-
+//     transmit-audio). Premiere pushes planar float, exactly the 1024 frames
+//     asked for, stamped with timeline time, on its own audio thread while
+//     PushVideo runs — once the user ticks "Audio Stream" for this device in
+//     Preferences > Playback. It goes into a second segment, created once at
+//     Startup in Premiere and reused for the whole host session (it never
+//     needs re-creating: its geometry fits any format). PushAudio touches
+//     nothing but that segment: no log, no suite, no ring growth. After
+//     Effects never calls any audio entry point, so it gets no segment.
 //
 // Privacy: a Transmit device receives no project paths or comp names; the
 // only label published is the host's name (DESIGN-NOTES privacy 5, 6).
@@ -65,6 +75,8 @@
 
 #include "common/convert/half_convert.h"
 #include "common/surface/shared_ring.h"
+#include "common/surface/audio_ring.h"
+#include "common/surface/audio_publisher.h"
 
 #if defined(_WIN32)
 #  ifndef WIN32_LEAN_AND_MEAN
@@ -76,6 +88,8 @@
 #  include <windows.h>
 #endif
 
+#include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
@@ -83,6 +97,7 @@
 #include <cstring>
 #include <ctime>
 #include <exception>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -181,6 +196,59 @@ struct Ring {
     HostState last_pause = HostState::Paused;
 };
 Ring S;
+
+// --- the audio segment: process-wide, created once per host session -----------
+// AudioPublisher owns the mapping and the rule that PushAudio (the host's
+// audio thread) and the host thread never collide over it. The host thread
+// starts/stops sessions and, on the last instance or module unload, quiesces.
+AudioPublisher S_audio;
+
+// What the pushing thread may update: counters only, relaxed, read by the
+// host thread for one summary line per session. Nothing here logs.
+struct AudioStats {
+    std::atomic<uint64_t> pushes{0}, frames{0}, packets{0};
+    std::atomic<int64_t>  first_time{0}, last_time{0};
+    std::atomic<uint32_t> channels{0};
+};
+AudioStats S_astats;
+std::atomic<uint32_t> S_push_flags{0};   // AudioPacketFlags for the current session
+
+// Premiere plays video in Playing mode without ever starting an audio
+// session exactly when "Audio Stream" is unticked for this device. A dozen
+// such pushes in a row (half a second at 24 fps) is the signal; one is not,
+// because StartPushAudio can trail the first Playing frame.
+constexpr uint32_t kPlayingPushesBeforeOff = 12;
+uint32_t S_playing_without_audio = 0;
+
+std::string audio_ring_name() { return std::string(S.host.ring) + kAudioRingSuffix; }
+
+// Created when absent, on the host thread: at Startup, at every
+// CreateInstance and at StartPushAudio. Premiere creates and disposes
+// placeholder instances while opening a project, and the last disposal
+// retires the segment like the frame ring (see DisposeInstance), so the
+// next instance has to bring it back. Premiere only: AE never pushes audio
+// (A8), and an empty segment would read as "audio off" in the viewer.
+void ensure_audio_ring(PrTime ticks_per_second) {
+    if (S_audio.has_ring() || ticks_per_second <= 0) return;
+    if (S.host.ring == nullptr || std::strcmp(S.host.ring, kRingNamePremiere) != 0) return;
+    auto ar = std::make_unique<AudioRing>();
+    if (!ar->create(audio_ring_name(), ticks_per_second)) {
+        logf("audio ring create failed: %s", ar->error().c_str());
+        return;
+    }
+    const auto* h = ar->header();
+    logf("audio ring %s created: %u slots x %u frames x %u ch (%llu KiB)", audio_ring_name().c_str(),
+         h->slot_count, h->slot_frames, h->max_channels, (unsigned long long)(h->total_size / 1024));
+    if (!S_audio.adopt(std::move(ar))) logf("audio ring adopt refused");
+}
+
+void quiesce_audio(const char* why) {
+    if (!S_audio.has_ring()) return;
+    if (S_audio.quiesce(50u))
+        logf("audio ring retired (%s)", why);
+    else
+        logf("audio ring LEAKED (%s): a push was still in flight after 50 ms", why);
+}
 
 HostState derived_state() {
     return S.video_on.empty() ? S.last_pause : HostState::Active;
@@ -351,6 +419,10 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
         logf("startup in %s: ring %s, ticks/s %lld", S.host.label, S.host.ring,
              static_cast<long long>(P->ticks_per_second));
 
+        // The audio segment survives a module reset like the frame ring
+        // (Startup runs again, the segment is already there).
+        ensure_audio_ring(P->ticks_per_second);
+
         std::snprintf(info->outIdentifier.mGUID, sizeof info->outIdentifier.mGUID, "%s", kPluginGUID);
         info->outPriority            = 0;
         info->outAudioAvailable      = kPrFalse;
@@ -364,7 +436,7 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
         info->outHideInUI            = kPrFalse;
         info->outHasSetup            = kPrFalse;
         info->outInterfaceVersion    = tmInterfaceVersion;
-        info->outPushAudioAvailable  = kPrFalse;
+        info->outPushAudioAvailable  = kPrTrue;    // the mirror tap; the user ticks "Audio Stream"
         info->outHasStreaming        = kPrFalse;
         return tmResult_Success;
     });
@@ -398,10 +470,11 @@ tmResult NeedsReset(const tmStdParms*, prBool* outReset) {
     });
 }
 
-tmResult CreateInstance(const tmStdParms*, tmInstance* inst) {
+tmResult CreateInstance(const tmStdParms* sp, tmInstance* inst) {
     return guarded("CreateInstance", [&] {
         inst->ioPrivateInstanceData = nullptr;
         S.instances.insert(inst->inInstanceID);
+        if (const Plugin* P = plugin(sp)) ensure_audio_ring(P->ticks_per_second);
         // Informational only: AE reports a 720x480 placeholder here until a
         // comp is open (A4). Geometry comes from each frame.
         logf("instance %d: %dx%d", inst->inInstanceID, inst->inVideoWidth, inst->inVideoHeight);
@@ -415,7 +488,11 @@ tmResult DisposeInstance(const tmStdParms*, tmInstance* inst) {
         publish_state();
         logf("instance %d disposed -> state %u", inst->inInstanceID, static_cast<unsigned>(derived_state()));
         S.instances.erase(inst->inInstanceID);
-        if (S.instances.empty()) retire_ring("last instance disposed");
+        S_audio.stop(inst->inInstanceID);   // only if this instance owned the session
+        if (S.instances.empty()) {
+            retire_ring("last instance disposed");
+            quiesce_audio("last instance disposed");
+        }
         return tmResult_Success;
     });
 }
@@ -535,6 +612,16 @@ void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
     S.ring.commit(d);
     publish_state();   // a new ring starts Active (zeroed); make it tell the truth
 
+    // The "Audio Stream" hint (see kPlayingPushesBeforeOff).
+    if (AudioRing* ar = S_audio.ring_for_host()) {
+        if (pv->inPlayMode != playmode_Playing || S_audio.owner() != AudioPublisher::kNoOwner) {
+            S_playing_without_audio = 0;
+        } else if (++S_playing_without_audio == kPlayingPushesBeforeOff) {
+            ar->set_host_audio(HostAudio::Off);
+            logf("playing without an audio session: Audio Stream is off for this device in Preferences > Playback");
+        }
+    }
+
     // Logged on the first frame, every size change, every 240th frame, after
     // ten seconds without a line and on any non-finite frame — enough to see
     // frames flowing without a line each.
@@ -560,6 +647,109 @@ void publish(Plugin* P, const tmPushVideo* pv, PPixHand h) {
                       (unsigned long long)S.published, uw, uh, order == HostOrder::ARGB ? "ARGB" : "BGRA",
                       cr.has_inf ? ", has inf" : "", cr.has_nan ? ", has NaN" : "",
                       fit.w != 0 ? ", over the cap" : "");
+}
+
+// --- audio: the mirror tap -----------------------------------------------------
+
+// Asked once per instance as soon as push audio is declared, even though we
+// are never the primary audio device; an instance whose module has no entry
+// for it is disposed on the spot (measured 2026-10-10: create, dispose, no
+// video-mode query). "Only one audio mode is currently supported": we echo
+// the instance's own format.
+tmResult QueryAudioMode(const tmStdParms* sp, const tmInstance* inst, csSDK_int32 index, tmAudioMode* out) {
+    return guarded("QueryAudioMode", [&] {
+        if (index != 0) return tmResult_ErrorInvalidArgument;
+        Plugin* P = plugin(sp);
+        const uint32_t ch = inst->inNumChannels > 0 ? std::min<uint32_t>(inst->inNumChannels, kMaxTransmitAudioChannels) : 2u;
+        out->outAudioSampleRate = inst->inAudioSampleRate > 0 ? inst->inAudioSampleRate : 48000.0f;
+        out->outMaxBufferSize   = 48000;
+        out->outNumChannels     = ch;
+        out->outLatency         = 0;
+        for (uint32_t i = 0; i < ch; ++i) {
+            out->outChannelLabels[i] = ch == 2 && i == 0 ? kPrAudioChannelLabel_FrontLeft
+                                     : ch == 2 && i == 1 ? kPrAudioChannelLabel_FrontRight
+                                     : inst->inNumChannels > i ? inst->inChannelLabels[i]
+                                     : kPrAudioChannelLabel_Discrete;
+            // Allocated by us, never disposed by us: the host owns what it
+            // reads (the same contract as the colour-space name).
+            char name[48];
+            std::snprintf(name, sizeof name, "QCView %u", i + 1);
+            PrSDKString str {};
+            if (P != nullptr && P->str != nullptr
+                && P->str->AllocateFromUTF8(reinterpret_cast<const prUTF8Char*>(name), &str) == 0)
+                out->outAudioOutputNames[i] = str;
+        }
+        return tmResult_Success;
+    });
+}
+
+tmResult StartPushAudio(const tmStdParms* sp, const tmInstance* inst, PrTime start, float speed, PrTime in,
+                        PrTime out, prBool loop, prBool scrubbing, csSDK_uint32* outSamplesPerFrame) {
+    return guarded("StartPushAudio", [&] {
+        *outSamplesPerFrame = kDefaultAudioSlotFrames;
+        AudioSession s {};
+        s.start_time  = start;
+        s.in_time     = in;
+        s.out_time    = out;
+        s.speed       = speed;
+        s.sample_rate = inst->inAudioSampleRate > 0 ? static_cast<uint32_t>(inst->inAudioSampleRate + 0.5f) : 48000u;
+        s.channels    = inst->inNumChannels > 0 ? inst->inNumChannels : 2u;
+        s.flags       = (loop ? kAudioSessionLoop : 0u) | (scrubbing ? kAudioSessionScrubbing : 0u);
+        s.push_frames = kDefaultAudioSlotFrames;
+        S_astats.pushes = 0; S_astats.frames = 0; S_astats.packets = 0;
+        S_astats.first_time = start; S_astats.last_time = start; S_astats.channels = s.channels;
+        S_playing_without_audio = 0;
+        S_push_flags.store(scrubbing ? kAudioPacketScrubbing : 0u, std::memory_order_relaxed);
+        if (const Plugin* P = plugin(sp)) ensure_audio_ring(P->ticks_per_second);
+        S_audio.start(inst->inInstanceID, s);
+        if (!scrubbing) {
+            const Plugin* P = plugin(sp);
+            const double sec = P != nullptr && P->ticks_per_second > 0
+                             ? static_cast<double>(start) / static_cast<double>(P->ticks_per_second) : 0.0;
+            logf("audio session: instance %d at %.3f s, speed %.2f, %u ch %u Hz%s%s", inst->inInstanceID, sec,
+                 speed, s.channels, s.sample_rate, loop ? ", loop" : "", S_audio.has_ring() ? "" : " (NO RING)");
+        }
+        return tmResult_Success;
+    });
+}
+
+// The host's audio thread, concurrent with everything else. Nothing here but
+// the segment and relaxed counters; a failure is a dropped push, not a log.
+tmResult PushAudio(const tmStdParms*, const tmInstance* inst, const tmPushAudio* a) {
+    if (a == nullptr || a->inBuffers == nullptr || a->inNumSamples == 0) return tmResult_Success;
+    const uint32_t rate = inst->inAudioSampleRate > 0 ? static_cast<uint32_t>(inst->inAudioSampleRate + 0.5f) : 48000u;
+    // Scrubbing is a session property; carried per packet so a consumer can
+    // treat scrub snippets differently without re-reading the session.
+    const uint32_t flags = S_push_flags.load(std::memory_order_relaxed);
+    const uint32_t n = S_audio.push(inst->inInstanceID, a->inBuffers, a->inNumChannels, rate,
+                                    a->inNumSamples, a->inTime, flags);
+    if (n > 0) {
+        S_astats.pushes.fetch_add(1, std::memory_order_relaxed);
+        S_astats.frames.fetch_add(a->inNumSamples, std::memory_order_relaxed);
+        S_astats.packets.fetch_add(n, std::memory_order_relaxed);
+        S_astats.last_time.store(a->inTime, std::memory_order_relaxed);
+    }
+    return tmResult_Success;
+}
+
+tmResult StopPushAudio(const tmStdParms* sp, const tmInstance* inst) {
+    return guarded("StopPushAudio", [&] {
+        const bool owned = S_audio.owner() == inst->inInstanceID;
+        S_audio.stop(inst->inInstanceID);
+        if (owned) {
+            const Plugin* P = plugin(sp);
+            const double tps = P != nullptr && P->ticks_per_second > 0 ? static_cast<double>(P->ticks_per_second) : 1.0;
+            const uint64_t frames = S_astats.frames.load(std::memory_order_relaxed);
+            if (frames > 0)
+                logf("audio session ended: instance %d, %llu pushes, %llu packets, %llu frames x %u ch, %.3f s .. %.3f s",
+                     inst->inInstanceID, (unsigned long long)S_astats.pushes.load(std::memory_order_relaxed),
+                     (unsigned long long)S_astats.packets.load(std::memory_order_relaxed),
+                     (unsigned long long)frames, S_astats.channels.load(),
+                     static_cast<double>(S_astats.first_time.load()) / tps,
+                     static_cast<double>(S_astats.last_time.load()) / tps);
+        }
+        return tmResult_Success;
+    });
 }
 
 tmResult PushVideo(const tmStdParms* sp, const tmInstance*, const tmPushVideo* pv) {
@@ -592,8 +782,13 @@ tmResult xTransmitEntry(csSDK_int32 interfaceVersion, prBool loadModule, piSuite
         out->QueryVideoMode     = QueryVideoMode;
         out->ActivateDeactivate = ActivateDeactivate;
         out->PushVideo          = PushVideo;
+        out->QueryAudioMode     = QueryAudioMode;
+        out->StartPushAudio     = StartPushAudio;
+        out->PushAudio          = PushAudio;
+        out->StopPushAudio      = StopPushAudio;
     } else {
         retire_ring("module unloaded");
+        quiesce_audio("module unloaded");
         logf("--- module unload ---");
     }
     return tmResult_Success;

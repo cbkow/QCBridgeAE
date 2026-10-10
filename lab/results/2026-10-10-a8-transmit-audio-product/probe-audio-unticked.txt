@@ -1,0 +1,5 @@
+/qcbae-premiere-audio: producer pid 22618 alive; 128 slots x 1024 frames x 16 ch, time_scale 254016000000; state Idle, host audio On, generation 3
+session 3: start 0.000 s, in 0.000, out 20.000, speed 1.00, 2 ch 48000 Hz, push 1024 frames
+6.0 s: 0 packets, 0 frames x 0 ch at 0 Hz = 0.000 s of audio, timeline 0.000 s .. 0.000 s
+resyncs 0 (dropped 0), frame gaps 0, time gaps 0 (> 1 sample from contiguous), new sessions 0
+peak:

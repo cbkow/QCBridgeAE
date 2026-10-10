@@ -25,6 +25,21 @@ they came from was a working document and is not part of the repository.
   frame: surface index, dimensions, source tier, channel order, value scale,
   the premultiplied-alpha flag, the host's name, frame time. Colour
   interpretation is the viewer's; nothing upstream guesses.
+- **D6 — Audio is a mirror, never a clock.** The device declares push
+  audio only: Premiere keeps its own audio device and pushes a copy of what
+  it plays — planar float32, the sequence's channels, in packets of exactly
+  the size the device asks for (1024 frames), each stamped with the
+  timeline position of its first sample — once the user ticks "Audio
+  Stream" for the device in Preferences → Playback. The device is never the
+  host's primary audio device or its playback clock, so there is no clock
+  of ours, no resampling and no mixer anywhere on the path; a consumer
+  aligns audio and video by the timestamps both carry. The samples cross
+  in their own segment (`<ring name>-audio`, magic `QCAA`, its own
+  version) so the frame ring's version never moves for them, in the host's
+  own layout, and the viewer folds channels by its own routing settings.
+  After Effects never calls an audio entry point (measured
+  2026-10-10, `lab/results/2026-10-10-a8-transmit-audio/`), so AE gets no
+  segment and no audio.
 
 ## The tap
 
@@ -52,8 +67,9 @@ no device can change (measured 2026-10-06).
   it proved bit-exact 8 bpc delivery and was superseded by the Transmit
   device, which rides the preview the host already rendered.
 - **A6.** One fixed shared-memory ring name per host (After Effects,
-  Premiere Pro). A consumer lists those names; there is no discovery and no
-  registry.
+  Premiere Pro), and since D6 one fixed audio segment name beside it
+  (`-audio`, Premiere only). A consumer lists those names; there is no
+  discovery and no registry.
 
 ## Privacy
 

@@ -1,0 +1,15 @@
+[09:47:54] --- module load, host interface v4 ---
+[09:47:54] startup in Premiere Pro: ring /qcbae-premiere, ticks/s 254016000000
+[09:47:54] audio ring /qcbae-premiere-audio created: 128 slots x 1024 frames x 16 ch (8216 KiB)
+[09:47:55] instance 13402: 1280x720
+[09:47:55] instance 13402: activation event 0, video 1 -> state 0
+[09:47:55] ring /qcbae-premiere created, 7200 KiB per slot
+[09:48:22] audio session: instance 13402 at 0.000 s, speed 1.00, 2 ch 48000 Hz
+[09:48:31] audio session ended: instance 13402, 429 pushes, 429 packets, 439296 frames x 2 ch, 0.000 s .. 9.131 s
+[09:48:57] audio session: instance 13402 at 9.080 s, speed -1.00, 2 ch 48000 Hz
+[09:49:01] audio session ended: instance 13402, 194 pushes, 194 packets, 198656 frames x 2 ch, 9.080 s .. 4.963 s
+[09:49:16] audio session: instance 13402 at 0.000 s, speed 1.00, 2 ch 48000 Hz
+[09:49:20] audio session ended: instance 13402, 194 pushes, 194 packets, 198656 frames x 2 ch, 0.000 s .. 4.117 s
+[09:50:04] playing without an audio session: Audio Stream is off for this device in Preferences > Playback
+[09:50:36] audio session: instance 13402 at 4.120 s, speed 1.00, 2 ch 48000 Hz
+[09:50:39] audio session ended: instance 13402, 147 pushes, 147 packets, 150528 frames x 2 ch, 4.120 s .. 7.235 s

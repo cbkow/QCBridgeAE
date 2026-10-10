@@ -6,7 +6,7 @@
 # and Transmit targets land later and are the only ones that will need one.
 
 cmake_minimum_required(VERSION 3.24)
-project(QCBridgeAE VERSION 0.2.2 LANGUAGES CXX)
+project(QCBridgeAE VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +21,7 @@ endif()
 # ---------------------------------------------------------------------------
 add_library(qcbae_common STATIC
     src/common/surface/shared_ring.cpp
+    src/common/surface/audio_ring.cpp
     src/common/convert/half_convert.cpp
 )
 target_include_directories(qcbae_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -221,6 +222,24 @@ if(BUILD_TESTING)
     add_executable(ring_unit_test tests/ring_unit_test.cpp)
     target_link_libraries(ring_unit_test PRIVATE qcbae_common)
     add_test(NAME ring_unit COMMAND ring_unit_test)
+
+    # The audio segment (DESIGN-NOTES D6): guard rails, the two-process
+    # crossing with a lapped reader, and the one in-process hazard — the host
+    # thread unmapping while the host's audio thread is mid-push.
+    add_executable(audio_ring_unit_test tests/audio_ring_unit_test.cpp)
+    target_link_libraries(audio_ring_unit_test PRIVATE qcbae_common)
+    add_test(NAME audio_ring_unit COMMAND audio_ring_unit_test)
+
+    add_executable(audio_tearing_test tests/audio_tearing_test.cpp)
+    target_link_libraries(audio_tearing_test PRIVATE qcbae_common)
+    add_test(NAME audio_tearing COMMAND audio_tearing_test)
+    set_tests_properties(audio_tearing PROPERTIES TIMEOUT 120)
+
+    find_package(Threads REQUIRED)
+    add_executable(audio_quiesce_test tests/audio_quiesce_test.cpp)
+    target_link_libraries(audio_quiesce_test PRIVATE qcbae_common Threads::Threads)
+    add_test(NAME audio_quiesce COMMAND audio_quiesce_test)
+    set_tests_properties(audio_quiesce PROPERTIES TIMEOUT 120)
 
     # The zero-copy claim that justified shared memory over IOSurface. It is
     # a test, not a note, because "the window looks right" cannot tell a

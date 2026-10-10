@@ -958,15 +958,19 @@ decides when the coordinated release can happen.
 Each will need a D3D11 twin when it lands on macOS. Nothing is queued here
 right now — dual live landed on 2026-09-22 and has its own section above.
 
-- [ ] **QCBridgeAE A8 — Premiere push audio, re-measure on Windows (added
-  2026-10-10).** The Mac probe showed Premiere pushes planar float audio to
-  a push-only Transmit device once "Audio Stream" is ticked in Playback
-  preferences, with no clock of ours (`lab/results/2026-10-10-a8-transmit-audio/`).
-  The probe `.prm` builds from the same source; when Premiere is on the
-  box, run it with `audio = push` in `%TEMP%\qcbridgeae-transmit.conf`,
-  tick the box, play, and compare the `StopPushAudio` summary (size,
-  cadence, gaps). After Effects is video-only on the Mac; one AE run to
-  confirm the same there is enough.
+- [ ] **QCBridgeAE A8 — audio over the bridge, build and verify on Windows
+  (added 2026-10-10).** The product now declares push audio and writes
+  Premiere's planar float into a second segment, `Local\qcbae-premiere-audio`
+  (`src/common/surface/audio_ring.*`, `audio_publisher.h`, DESIGN-NOTES D6;
+  measured on the Mac in `lab/results/2026-10-10-a8-transmit-audio/` and
+  `…-product/`). To do on the box: (1) build; `ctest` must pass
+  `audio_ring_unit`, `audio_tearing` and `audio_quiesce` — the Windows
+  create/replace path (CreateFileMapping + Retired retry) is untested
+  anywhere else; (2) when Premiere is on the box, tick **Audio Stream** for
+  the device in Preferences → Playback, play a sequence with audio, and
+  check `%TEMP%\qcbridgeae-transmit.log` for the "audio session ended"
+  summary (packets == pushes, frames == 1024 × pushes). `qcbae-probe audio`
+  is macOS-only; QCView's meters are the consumer-side check there.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 

@@ -2,6 +2,14 @@
 
 **QCBridgeAE for After Effects and Premiere Pro** is a Mercury Transmit plugin that streams live viewport output from the the AE or Premiere to [QCView](https://qcview.app/). The output is unaltered and full float, converted to 1/2 float in QCView so the image quality is preserved under all circumstances, including HDR scenarios. See the [add-on](https://qcview.app/qcbridge/adobe/) page for more info.
 
+**Audio (Premiere Pro).** The device can carry the sequence's audio to
+QCView alongside the picture. Premiere keeps playing through its own audio
+device; the plugin receives a copy. Switch it on per device: Preferences →
+Playback → Transmit Device Playback → tick **Audio Stream** next to
+"QCBridgeAE → QCView". After Effects does not send audio to Transmit
+devices (its own limitation, measured in
+`lab/results/2026-10-10-a8-transmit-audio/`).
+
 **Large comps.** A comp that fits inside 3840×2160 arrives pixel for pixel.
 A larger one is scaled by the host to fit inside 3840×2160 (aspect kept)
 before it is handed over: asked for at full size, an 8000×8000 comp is a

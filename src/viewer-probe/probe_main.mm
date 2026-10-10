@@ -27,6 +27,7 @@
 #import <QuartzCore/CAMetalLayer.h>
 
 #include "common/surface/shared_ring.h"
+#include "common/surface/audio_ring.h"
 
 #include <cerrno>
 #include <chrono>
@@ -323,6 +324,113 @@ int run_dump(int argc, const char** argv) {
 }
 
 // ---------------------------------------------------------------------------
+// audio — the consumer-side instrument for the audio segment (A8). Opens the
+// ring next to the frame ring, consumes for N seconds, and reports what a
+// viewer would see: packets, drops, contiguity, cadence, level.
+// ---------------------------------------------------------------------------
+int run_audio(int argc, const char** argv) {
+    double seconds = 8.0;
+    for (int i = 2; i + 1 < argc; i += 2) {
+        const std::string k = argv[i], v = argv[i + 1];
+        if (k == "--seconds") seconds = std::atof(v.c_str());
+    }
+    std::string name = g_ring;
+    const std::string suffix = kAudioRingSuffix;
+    if (name.size() < suffix.size() || name.compare(name.size() - suffix.size(), suffix.size(), suffix) != 0)
+        name += suffix;
+
+    // The segment exists only while the host has a Transmit instance, and
+    // Premiere creates one when playback starts: wait up to the run's
+    // length for it rather than failing on a quiet host.
+    AudioRing ring;
+    const auto give_up = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);
+    while (!ring.open(name)) {
+        if (std::chrono::steady_clock::now() >= give_up) {
+            std::fprintf(stderr, "audio: %s (%s)\n", ring.error().c_str(), name.c_str());
+            return 1;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    const auto* h = ring.header();
+    const pid_t producer = static_cast<pid_t>(h->producer_pid);
+    const bool alive = producer > 0 && (::kill(producer, 0) == 0 || errno == EPERM);
+    const char* states[] = {"Idle", "Pushing", "Retired"};
+    const char* hosts[]  = {"Unknown", "Off", "On"};
+    const auto st = static_cast<unsigned>(ring.state()), ha = static_cast<unsigned>(ring.host_audio());
+    std::printf("%s: producer pid %d %s; %u slots x %u frames x %u ch, time_scale %lld; state %s, host audio %s, generation %llu\n",
+                name.c_str(), static_cast<int>(producer), alive ? "alive" : "DEAD", h->slot_count, h->slot_frames,
+                h->max_channels, static_cast<long long>(h->time_scale), st < 3 ? states[st] : "?",
+                ha < 3 ? hosts[ha] : "?", (unsigned long long)ring.generation());
+    if (!alive) std::printf("STALE RING: nothing below is a live measurement\n");
+
+    AudioSession ses {};
+    uint64_t gen = 0;
+    auto print_session = [&] {
+        const double tps = static_cast<double>(h->time_scale);
+        std::printf("session %llu: start %.3f s, in %.3f, out %.3f, speed %.2f, %u ch %u Hz, push %u frames%s%s\n",
+                    (unsigned long long)gen, ses.start_time / tps, ses.in_time / tps, ses.out_time / tps, ses.speed,
+                    ses.channels, ses.sample_rate, ses.push_frames,
+                    (ses.flags & kAudioSessionLoop) ? ", loop" : "", (ses.flags & kAudioSessionScrubbing) ? ", scrubbing" : "");
+    };
+    if (ring.read_session(&ses, &gen)) print_session();
+
+    std::vector<float> planes(static_cast<size_t>(h->max_channels) * h->slot_frames);
+    uint64_t last = 0, dropped = 0, packets = 0, frames = 0, resyncs = 0, sessions = 0;
+    uint64_t frame_gaps = 0, time_gaps = 0;
+    float peak[kMaxAudioChannels] = {};
+    uint32_t channels = 0, rate = 0;
+    uint64_t prev_first = 0; uint32_t prev_frames = 0; int64_t prev_time = 0; bool have_prev = false;
+    double wall_prev = 0, interval_sum = 0, interval_max = 0; uint64_t intervals = 0;
+    int64_t t_first = 0, t_last = 0;
+    ring.skip_to_latest(&last);
+    const auto until = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);
+    while (std::chrono::steady_clock::now() < until) {
+        AudioPacketDesc d {};
+        const auto r = ring.next_packet(&last, &d, planes.data(), &dropped);
+        if (r == AudioRing::Next::Resynced) { ++resyncs; continue; }
+        if (r == AudioRing::Next::None) {
+            if (ring.read_session(&ses, &gen)) { ++sessions; print_session(); have_prev = false; }
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            continue;
+        }
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (packets == 0) t_first = d.time_value;
+        t_last = d.time_value;
+        if (have_prev) {
+            if (d.first_frame != prev_first + prev_frames) ++frame_gaps;
+            // Timeline time runs with the session's speed sign: backwards in reverse.
+            const int64_t step = static_cast<int64_t>(prev_frames) * h->time_scale / static_cast<int64_t>(d.sample_rate);
+            const int64_t expect = prev_time + (ses.speed < 0 ? -step : step);
+            const int64_t tick_per_frame = h->time_scale / static_cast<int64_t>(d.sample_rate);
+            if (std::llabs(d.time_value - expect) > tick_per_frame) ++time_gaps;
+            const double iv = now - wall_prev;
+            interval_sum += iv; if (iv > interval_max) interval_max = iv; ++intervals;
+        }
+        prev_first = d.first_frame; prev_frames = d.frames; prev_time = d.time_value; wall_prev = now; have_prev = true;
+        channels = d.channels; rate = d.sample_rate;
+        for (uint32_t c = 0; c < d.channels && c < kMaxAudioChannels; ++c)
+            for (uint32_t i = 0; i < d.frames; ++i) {
+                const float v = std::fabs(planes[static_cast<size_t>(c) * h->slot_frames + i]);
+                if (v > peak[c]) peak[c] = v;
+            }
+        ++packets; frames += d.frames;
+    }
+    const double tps = static_cast<double>(h->time_scale);
+    std::printf("%.1f s: %llu packets, %llu frames x %u ch at %u Hz = %.3f s of audio, timeline %.3f s .. %.3f s\n",
+                seconds, (unsigned long long)packets, (unsigned long long)frames, channels, rate,
+                rate > 0 ? static_cast<double>(frames) / rate : 0.0, t_first / tps, t_last / tps);
+    std::printf("resyncs %llu (dropped %llu), frame gaps %llu, time gaps %llu (> 1 sample from contiguous), new sessions %llu\n",
+                (unsigned long long)resyncs, (unsigned long long)dropped, (unsigned long long)frame_gaps,
+                (unsigned long long)time_gaps, (unsigned long long)sessions);
+    if (intervals > 0)
+        std::printf("cadence: mean %.2f ms, max %.2f ms between packets\n", 1000.0 * interval_sum / intervals, 1000.0 * interval_max);
+    std::printf("peak:");
+    for (uint32_t c = 0; c < channels && c < kMaxAudioChannels; ++c) std::printf(" ch%u %.3f", c + 1, peak[c]);
+    std::printf("\n");
+    return !alive ? 3 : packets > 0 ? 0 : 4;
+}
+
+// ---------------------------------------------------------------------------
 // view
 // ---------------------------------------------------------------------------
 NSString* const kShaderSource = @R"(
@@ -603,6 +711,7 @@ int main(int argc, const char** argv_in) {
         return run_producer(w, h, fps, tier);
     }
     if (mode == "dump") return run_dump(argc, argv);
+    if (mode == "audio") return run_audio(argc, argv);
     if (mode == "view") {
         @autoreleasepool {
             [NSApplication sharedApplication];
@@ -618,6 +727,7 @@ int main(int argc, const char** argv_in) {
         "  qcbae-probe produce [--width W] [--height H] [--fps N]\n"
         "  qcbae-probe view\n"
         "  qcbae-probe dump [x y]...\n"
+        "  qcbae-probe audio [--seconds N]   (the ring's -audio segment)\n"
         "  any mode: --ring ae | premiere | /name   (default /qcbae-probe)\n");
     return 2;
 }
