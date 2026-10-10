@@ -971,6 +971,20 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   check `%TEMP%\qcbridgeae-transmit.log` for the "audio session ended"
   summary (packets == pushes, frames == 1024 × pushes). `qcbae-probe audio`
   is macOS-only; QCView's meters are the consumer-side check there.
+- [ ] **QCView — live audio from the bridge, build and verify on Windows
+  (added 2026-10-10, branch `live-audio` in QCView-Player).** New
+  `src/audio/live_audio_source.*` reads the vendored audio segment
+  (`src/decode/qcbae/audio_ring.*`, `Local\qcbae-premiere-audio`) on its
+  own thread and feeds the WASAPI path through the normal IAudioSource
+  drain; `HostBridgeSource` reads the segment's facts and holds frames for
+  a negative live offset. Nothing platform-specific was added, but the
+  file-mapping open/retire path of the audio ring has only run on macOS.
+  To do: build; `tests/audio/live_audio_source_test.cpp` (standalone,
+  build line in its header) must pass; with Premiere on the box, open
+  `qcbae://premiere`, tick Listen in the Inspector's Audio card, hear the
+  tone, see the meters, watch for stutter (raise "Live audio buffer" if
+  so) and note the WASAPI device latency against the Mac's for the
+  A/V-sync default.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
