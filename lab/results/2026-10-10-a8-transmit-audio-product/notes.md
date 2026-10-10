@@ -50,7 +50,37 @@ box ticked again, next play → session 4, `host_audio = On`. A viewer can
 turn Off into "tick Audio Stream for QCBridgeAE → QCView in Premiere ▸
 Preferences ▸ Playback".
 
+## QCView reading the same segment (12:36–12:43)
+
+QCView main at 4854dc0e + 8b42c3ec (`LiveAudioSource`), opened on
+`qcbae://premiere` while the probe tool read the segment alongside it —
+two consumers, no reader claim, neither disturbs the other.
+
+- Play: the Inspector's Audio card shows State Pushing, 48000 Hz,
+  2 (stereo), meters moving; the probe beside it saw 282 packets in 6 s,
+  0 resyncs, 0 frame gaps, 0 time gaps, cadence 21.34 ms mean / 22.72 max,
+  peak 0.089 both channels. Stop: State Idle. QCView's own counter after
+  ~43 s of play: 2000 packets, resync-dropped 0, depth-dropped 0.
+- Listen off → on (the Inspector switch; pref `audio.livePlaydown` = 1):
+  meters identical either way, as designed — the output is zeroed after
+  the drain, not before. Hearing the tone is Chris's check (Premiere's
+  own output was moved to the MacBook speakers to keep the two apart).
+- Reverse (J): session at speed −1.00, 240 packets in 5 s.
+- Quit Premiere mid-play (Cmd+Q): Premiere never reaches the plugin's
+  DisposeInstance / module unload (no "retired" or "unload" line in the
+  log, same as the frame ring has always behaved), so both segments are
+  left behind; QCView removes them as a dead producer's
+  ("removed the segment a dead producer left"), stays up, and on relaunch
+  reopens both against the new pid within a poll. Play then flows again
+  (187 packets / 4 s, 0 resyncs).
+- Found and fixed (8b42c3ec): the live meters held the last packet's
+  level after a stop; the reader now clears them after 100 ms without a
+  packet.
+
 ## Not measured here
 
 Speeds beyond ±1 and loop wrap (same keystroke limits as the probe run);
-Windows (tracked in `lab/TRACKING-windows.md`).
+a 5.1 sequence (routing pills and the fold), dual view with a live side,
+the A/V sync (Live) offset and scrub mute in the app — all built and
+unit-tested, not yet exercised against Premiere; Windows (tracked in
+`lab/TRACKING-windows.md`).
