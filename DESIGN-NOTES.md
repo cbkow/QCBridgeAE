@@ -70,6 +70,18 @@ no device can change (measured 2026-10-06).
   Premiere Pro), and since D6 one fixed audio segment name beside it
   (`-audio`, Premiere only). A consumer lists those names; there is no
   discovery and no registry.
+- **Out (2026-10-11).** The same rings carry QCView's own output the other
+  way: `src/common/surface/output_ring.*` and `protocol/output_desc.h` are
+  the frame ring with the roles reversed plus a consumer block (request,
+  reply, heartbeat, status), one pair per sink under `/qcview-out-<id>`
+  and `-audio`. The decisions are QCBridgeN's (`PLAN.md` O1–O14 there);
+  this repository holds the wire contract because the ring code lives
+  here. To make that possible without forking, the mapping
+  (`ring_mapping.*`) and the slot protocol (`ring_slots.h`) are shared by
+  all three rings; the Transmit headers kept their shipped layouts and the
+  same tests prove it. `src/common/surface/` and `protocol/` are MIT as
+  well as GPL (`src/common/LICENSE`) so a sink under any licence can
+  vendor them.
 
 ## Privacy
 

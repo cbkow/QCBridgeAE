@@ -20,8 +20,10 @@ endif()
 # qcbae_common — the shared-surface spine (phase A1)
 # ---------------------------------------------------------------------------
 add_library(qcbae_common STATIC
+    src/common/surface/ring_mapping.cpp
     src/common/surface/shared_ring.cpp
     src/common/surface/audio_ring.cpp
+    src/common/surface/output_ring.cpp
     src/common/convert/half_convert.cpp
 )
 target_include_directories(qcbae_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -234,6 +236,15 @@ if(BUILD_TESTING)
     target_link_libraries(audio_tearing_test PRIVATE qcbae_common)
     add_test(NAME audio_tearing COMMAND audio_tearing_test)
     set_tests_properties(audio_tearing PROPERTIES TIMEOUT 120)
+
+    # The output ring (QCBridgeN/PLAN.md): the request/reply handshake, the
+    # consumer heartbeat, the frame path, and every O13 lifecycle transition
+    # the ring can see — producer retires, producer dies, consumer leaves,
+    # consumer dies — before either real side exists.
+    add_executable(output_ring_unit_test tests/output_ring_unit_test.cpp)
+    target_link_libraries(output_ring_unit_test PRIVATE qcbae_common)
+    add_test(NAME output_ring_unit COMMAND output_ring_unit_test)
+    set_tests_properties(output_ring_unit PROPERTIES TIMEOUT 60)
 
     find_package(Threads REQUIRED)
     add_executable(audio_quiesce_test tests/audio_quiesce_test.cpp)

@@ -37,6 +37,7 @@
 #pragma once
 
 #include "common/protocol/audio_desc.h"
+#include "common/surface/ring_mapping.h"
 
 #include <atomic>
 #include <cstddef>
@@ -108,10 +109,10 @@ public:
     // Consumer side.
     bool open(const std::string& name);
 
-    bool valid() const { return base_ != nullptr; }
-    const std::string& error() const { return error_; }
+    bool valid() const { return map_.valid(); }
+    const std::string& error() const { return error_.empty() ? map_.error() : error_; }
     const AudioRingHeader* header() const { return header_; }
-    const std::string& name() const { return name_; }
+    const std::string& name() const { return map_.name(); }
 
     // --- Producer, host thread ---------------------------------------------
     void begin_session(const AudioSession& s);   // seqlock write, generation++, state Pushing
@@ -157,16 +158,8 @@ private:
     AudioSlotHeader* slot_at(uint32_t index) const;
     float* planes_at(uint32_t index) const;
 
-    void*            base_    = nullptr;
-    size_t           size_    = 0;
+    SharedMapping    map_;
     AudioRingHeader* header_  = nullptr;
-#if defined(_WIN32)
-    void*            mapping_ = nullptr;
-#else
-    int              fd_      = -1;
-#endif
-    bool             owner_   = false;
-    std::string      name_;
     std::string      error_;
 
     // Producer bookkeeping; touched only by the pushing thread.

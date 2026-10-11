@@ -65,6 +65,11 @@ enum AudioSessionFlags : uint32_t {
 
 enum AudioPacketFlags : uint32_t {
     kAudioPacketScrubbing  = 1u << 0,   // pushed during a scrub session
+    // The producer muted this packet: the samples are zeros and keep their
+    // cadence, so a consumer's clock never notices. The output bus uses it
+    // for QCView's feed mute (QCBridgeN/PLAN.md O6); the Transmit device never
+    // sets it. A flag bit, not a layout change: the version stays.
+    kAudioPacketMuted      = 1u << 1,
 };
 
 // One per StartPushAudio: what the host said playback is. The consumer reads

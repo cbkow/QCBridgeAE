@@ -1008,6 +1008,18 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   owed by ear on the box (the session has no ears there).
   `lab/results/2026-10-11-a8-windows/`.
 
+- [ ] **QCBridgeAE — the shared mapping refactor and the output ring, build
+  and test on Windows (added 2026-10-11, QCBridgeAE main after 308536e).**
+  `ring_mapping.*` now holds the one copy of the CreateFileMapping /
+  Retired-retry / OpenFileMapping code all three rings use; `ring_slots.h`
+  the claim+seqlock protocol; `output_ring.*` + `protocol/output_desc.h`
+  the output bus ring (QCBridgeN/PLAN.md P1). Wire layouts of the Transmit
+  rings are unchanged. To do on the box: `build-ae.cmd`; ctest must pass
+  all of ring_unit, ring_tearing, audio_ring_unit, audio_tearing,
+  audio_quiesce AND the new `output_ring_unit` (its forked-producer case is
+  POSIX-only and compiled out; the rest runs). Then QCView's vendored copy
+  (same commit) must build there.
+
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
 - **Zero-copy ingest** (QCBridgeAE). Measured 2026-09-22 and parked: saves
