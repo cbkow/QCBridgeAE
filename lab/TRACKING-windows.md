@@ -1041,6 +1041,17 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   frames at the source rate with the clip's pixels, as the Mac run in
   QCBridgeN `lab/results/2026-10-11-p2-bus/`.
 
+- [ ] **QCBridgeN on Windows (added 2026-10-11, QCBridgeN `f422ca3`,
+  PLAN.md P3/P4).** After the D3D11 output pass above lands: build the
+  repo on the box (`cmake -DCMAKE_PREFIX_PATH=C:\Qt\6.11.1\msvc2022_64
+  -DNDI_SDK_DIR="C:\Program Files\NDI\NDI 6 SDK"`; `src/sink/ndi_lib.cpp`
+  loads `Processing.NDI.Lib.x64.dll` from `%NDI_RUNTIME_DIR_V6%`), register
+  a manifest under `%ProgramData%\QCView\Outputs`, enable the output in
+  QCView, and prove it with `ndi-recv` the way the Mac run did
+  (`lab/results/2026-10-11-p3-ndi/` there): 1080p at the clip's rate, 48
+  kHz audio, the frame is the clip. `qcvo-probe` builds there without the
+  SDK and tests the bus alone.
+
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
 - **Zero-copy ingest** (QCBridgeAE). Measured 2026-09-22 and parked: saves
