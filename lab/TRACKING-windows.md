@@ -1024,6 +1024,23 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   vendored copy (`8be0d290`) is owed a Windows build with the next QCView
   item.
 
+- [ ] **QCView — the output bus's D3D11 twin (added 2026-10-11, QCView
+  main `5f5ea6f1`, QCBridgeN/PLAN.md P2/P4).** The bus itself (window/
+  output_bus.*: manifests under `%ProgramData%\QCView\Outputs`, rings,
+  the plugin process, request/reply, the audio tap in AudioPlayer and the
+  dual mixer) is shared code and **builds on the box** (`build-qcview18.cmd`,
+  2026-10-11). The renderer side is Metal-only: `IPlayerRenderer::
+  setOutputTargets` is a no-op in D3D11PlayerRenderer, so an enabled
+  output on Windows gets audio but no frames. To do: the output pass in
+  `d3d11_player_renderer.cpp` after the corrected canvas — composite at
+  the sink's raster into an RGBA16F target, the SDR capture OCIO, a
+  BGRA8 target with guides/strokes, CopyResource to a staging texture,
+  Map, one memcpy into the ring slot (O9: the one copy Windows owes),
+  commit at the next frame after the copy is done. Evidence: `qcvo-probe
+  consume` (build it on the box: QCBridgeN `tools/qcvo-probe`) reading
+  frames at the source rate with the clip's pixels, as the Mac run in
+  QCBridgeN `lab/results/2026-10-11-p2-bus/`.
+
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
 - **Zero-copy ingest** (QCBridgeAE). Measured 2026-09-22 and parked: saves
