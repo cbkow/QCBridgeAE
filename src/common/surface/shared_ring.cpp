@@ -94,7 +94,7 @@ bool SharedRing::open(const std::string& name) {
 
 void* SharedRing::begin_write(uint64_t bytes) {
     if (!valid()) return nullptr;
-    void* p = slots::begin_write<RingHeader, SlotHeader>(map_.base(), header_, &writer_, bytes);
+    void* p = ringslot::begin_write<RingHeader, SlotHeader>(map_.base(), header_, &writer_, bytes);
     if (p == nullptr && !writer_.open() && bytes > header_->pixels_capacity)
         error_ = "frame larger than slot capacity";
     return p;
@@ -102,23 +102,23 @@ void* SharedRing::begin_write(uint64_t bytes) {
 
 void SharedRing::commit(const FrameDesc& desc) {
     if (!valid()) return;
-    slots::commit<RingHeader, SlotHeader, FrameDesc>(map_.base(), header_, &writer_, desc);
+    ringslot::commit<RingHeader, SlotHeader, FrameDesc>(map_.base(), header_, &writer_, desc);
 }
 
 void SharedRing::abandon() {
     if (!valid()) return;
-    slots::abandon<RingHeader, SlotHeader>(map_.base(), header_, &writer_);
+    ringslot::abandon<RingHeader, SlotHeader>(map_.base(), header_, &writer_);
 }
 
 bool SharedRing::acquire_latest(uint64_t* last_seen, FrameDesc* out_desc, const void** out_pixels) {
     if (!valid()) return false;
-    return slots::acquire_latest<RingHeader, SlotHeader, FrameDesc>(
+    return ringslot::acquire_latest<RingHeader, SlotHeader, FrameDesc>(
         map_.base(), header_, &held_, last_seen, out_desc, out_pixels);
 }
 
 void SharedRing::release() {
     if (!valid()) return;
-    slots::release(header_, &held_);
+    ringslot::release(header_, &held_);
 }
 
 bool SharedRing::set_icc_profile(const void* data, uint32_t len) {

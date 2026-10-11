@@ -159,7 +159,7 @@ private:
     SharedMapping map_;
     RingHeader*   header_ = nullptr;
     std::string   error_;
-    slots::Writer writer_;
+    ringslot::Writer writer_;
     uint64_t      held_ = 0;   // consumer: the packed claim it holds, or 0
 };
 
