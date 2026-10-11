@@ -46,3 +46,9 @@ writing there.
 Licensed GPL-3.0-or-later ([LICENSE](LICENSE)), like QCBridge. The Adobe After
 Effects and Premiere Pro SDKs it builds against are Adobe's, are not included,
 and are not covered by that licence.
+
+The wire contract — the shared-memory frame and audio rings and their sidecar
+schemas in `src/common/surface/` and `src/common/protocol/` — is additionally
+offered under the MIT licence ([src/common/LICENSE](src/common/LICENSE)), so a
+consumer under any licence can carry it. QCView vendors those files; so will
+the output sinks that read QCView's own rings.

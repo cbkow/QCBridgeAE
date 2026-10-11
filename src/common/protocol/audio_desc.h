@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT OR GPL-3.0-or-later
+// Copyright (c) 2026 cbkow. See src/common/LICENSE: the ring and sidecar
+// files are MIT in addition to the repository's GPL so that consumers under
+// any licence can carry the wire contract.
 // QCBridgeAE — the audio sidecar schema (DESIGN-NOTES D6).
 //
 // Audio crosses in its own segment, next to the frame ring, because the frame

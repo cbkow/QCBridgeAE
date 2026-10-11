@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT OR GPL-3.0-or-later
+// Copyright (c) 2026 cbkow. See src/common/LICENSE: the ring and sidecar
+// files are MIT in addition to the repository's GPL so that consumers under
+// any licence can carry the wire contract.
 #include "common/surface/audio_ring.h"
 #include "common/surface/shared_ring.h"   // kMaxShmName, process_alive
 

@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT OR GPL-3.0-or-later
+// Copyright (c) 2026 cbkow. See src/common/LICENSE: the ring and sidecar
+// files are MIT in addition to the repository's GPL so that consumers under
+// any licence can carry the wire contract.
 // QCBridgeAE — the shared frame ring.
 //
 // A fixed set of page-aligned pixel slots in shared memory, plus a sidecar
