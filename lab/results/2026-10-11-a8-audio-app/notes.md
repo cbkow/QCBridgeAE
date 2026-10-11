@@ -73,16 +73,31 @@ Channels rows, because `liveSrc` binds `WindowManager.liveDecoder`,
 which is null in dual. Either hide the two rows in dual or bind them to
 `dualLiveA` / `dualLiveB`.
 
-## Not yet exercised
+## A/V sync (Live) and Mute scrub audio (14:05–14:12, QCView rebuilt)
 
-The A/V sync (Live) spin box (Settings ▸ Audio, ±200 ms; positive =
-deeper audio buffer, negative = video hold) and **Mute scrub audio**
-against a Premiere scrub (the plugin flags scrub sessions; the source
-zeroes flagged packets when the setting is on — the meters are
-pre-fold so they do not show the mute; the output does). Both are
-still unit-tested only. The run stopped here because Chris was using
-the machine at the same time (Slack, Chrome) and the CGEvent clicks
-and scrolls started landing in his windows.
+QCView got two log lines first so both are readable without ears: the
+offset setter says what it set, and the reader says when it silences
+scrub packets (counted in the periodic line too). Then, with the machine
+free (`qcview-offset-and-scrub-lines.txt`):
+
+- **Offset.** Settings ▸ Audio ▸ A/V sync (Live) is a read-only spin
+  box (arrows only; press-and-hold auto-repeats). Held up to 110 ms:
+  `live A/V sync offset 110 ms for qcbae://premiere (audio depth +110
+  ms, video hold 0 ms)`, pref `audio.liveSyncOffsetMs.premiere` = 110,
+  and the next play's reader line read `depth target 170 ms` — the 60 ms
+  buffer plus the offset, consumed. Reverted to 0 with the row's ↺.
+- **Scrub.** Mute scrub audio on; a press on Premiere's timeline ruler
+  (`probe-51-scrub.txt`): the plugin opened `session 8: start 0.880 s …
+  scrubbing` with two flagged packets (`audio session ended: 2 pushes, 2
+  packets, 0.880 s .. 0.901 s`), and QCView logged `scrub packets
+  silenced (Mute scrub audio is on)`. The chain holds end to end. A
+  synthetic ruler *drag* moves the playhead on release but produces no
+  scrub audio in Premiere (same class of limit as the J-K-L double taps),
+  so a sustained scrub stays a by-hand check. Setting restored to off.
+- **Dual Audio card fixed** (`inspector-51-dual-side-b.png`): with the
+  file on A and Premiere on B, the Inspector's B side now shows State
+  Pushing, 48000 Hz, 6 channels, Mix 5.1 → 2 and the meters — the card
+  binds the inspected side's own source in dual.
 
 ## Harness notes
 
