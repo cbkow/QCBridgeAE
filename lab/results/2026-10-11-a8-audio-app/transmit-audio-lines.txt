@@ -1,0 +1,10 @@
+16:[13:48:51] audio session: instance 49123 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+19:[13:49:01] audio session ended: instance 49123, 490 pushes, 490 packets, 501760 frames x 6 ch, 0.000 s .. 10.432 s
+23:[13:49:39] audio session: instance 49123 at 10.400 s, speed 1.00, 6 ch 48000 Hz
+25:[13:49:44] audio session ended: instance 49123, 258 pushes, 258 packets, 264192 frames x 6 ch, 10.400 s .. 15.883 s
+27:[13:50:07] audio session: instance 49123 at 15.880 s, speed 1.00, 6 ch 48000 Hz
+32:[13:50:11] audio session ended: instance 49123, 193 pushes, 193 packets, 197632 frames x 6 ch, 15.880 s .. 19.976 s
+33:[13:50:11] audio session: instance 49123 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+38:[13:50:32] audio session ended: instance 49123, 938 pushes, 938 packets, 960512 frames x 6 ch, 0.000 s .. 19.989 s
+39:[13:54:42] audio session: instance 49123 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+42:[13:54:48] audio session ended: instance 49123, 283 pushes, 283 packets, 289792 frames x 6 ch, 0.000 s .. 6.016 s
