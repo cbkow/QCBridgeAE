@@ -1008,7 +1008,7 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   owed by ear on the box (the session has no ears there).
   `lab/results/2026-10-11-a8-windows/`.
 
-- [ ] **QCBridgeAE — the shared mapping refactor and the output ring, build
+- [x] **QCBridgeAE — the shared mapping refactor and the output ring, build
   and test on Windows (added 2026-10-11, QCBridgeAE main after 308536e).**
   `ring_mapping.*` now holds the one copy of the CreateFileMapping /
   Retired-retry / OpenFileMapping code all three rings use; `ring_slots.h`
@@ -1019,6 +1019,10 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   audio_quiesce AND the new `output_ring_unit` (its forked-producer case is
   POSIX-only and compiled out; the rest runs). Then QCView's vendored copy
   (same commit) must build there.
+  *Windows 2026-10-11:* `5849977` built with `build-ae.cmd`, **7/7 ctest**
+  incl. `output_ring_unit` (0.04 s), `audio_tearing` 29.7 s. QCView's
+  vendored copy (`8be0d290`) is owed a Windows build with the next QCView
+  item.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
