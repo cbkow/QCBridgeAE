@@ -958,7 +958,7 @@ decides when the coordinated release can happen.
 Each will need a D3D11 twin when it lands on macOS. Nothing is queued here
 right now — dual live landed on 2026-09-22 and has its own section above.
 
-- [ ] **QCBridgeAE A8 — audio over the bridge, build and verify on Windows
+- [x] **QCBridgeAE A8 — audio over the bridge, build and verify on Windows
   (added 2026-10-10).** The product now declares push audio and writes
   Premiere's planar float into a second segment, `Local\qcbae-premiere-audio`
   (`src/common/surface/audio_ring.*`, `audio_publisher.h`, DESIGN-NOTES D6;
@@ -971,8 +971,19 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   check `%TEMP%\qcbridgeae-transmit.log` for the "audio session ended"
   summary (packets == pushes, frames == 1024 × pushes). `qcbae-probe audio`
   is macOS-only; QCView's meters are the consumer-side check there.
-- [ ] **QCView — live audio from the bridge, build and verify on Windows
-  (added 2026-10-10, branch `live-audio` in QCView-Player).** New
+  *Windows 2026-10-11:* done. `build-ae.cmd` on main `b75a204` (VS 18, MSVC
+  14.51): 6/6 ctest pass incl. `audio_ring_unit`, `audio_tearing`,
+  `audio_quiesce` (the CreateFileMapping create/replace path ran for the
+  first time); Inno made `QCBridgeAE-0.3.0-Setup-x64.exe` (copied to the
+  Mac's `dist/`, SHA-256 matches). The `.prm` installed over 0.2.2 in
+  MediaCore, Premiere Pro 2026 with the device's audio ticked (pref key
+  `…QCBridgeAE_45_Transmit.prm0EnabledSecondaryAudio`): `audio ring
+  Local\qcbae-premiere-audio created`, and a 20 s 5.1 sequence gave `audio
+  session: … 6 ch 48000 Hz` → `audio session ended: 938 pushes, 938
+  packets, 960512 frames x 6 ch, 0.000 s .. 19.989 s` on every play (five
+  plays over two launches). `lab/results/2026-10-11-a8-windows/`.
+- [x] **QCView — live audio from the bridge, build and verify on Windows
+  (added 2026-10-10, now on QCView-Player main).** New
   `src/audio/live_audio_source.*` reads the vendored audio segment
   (`src/decode/qcbae/audio_ring.*`, `Local\qcbae-premiere-audio`) on its
   own thread and feeds the WASAPI path through the normal IAudioSource
@@ -985,6 +996,17 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   tone, see the meters, watch for stutter (raise "Live audio buffer" if
   so) and note the WASAPI device latency against the Mac's for the
   A/V-sync default.
+  *Windows 2026-10-11:* done. QCView main `ab4f0f67` builds (`build-release`,
+  Qt 6.11.1 msvc2022_64); `live_audio_source_test` compiled with `cl` against
+  Qt6Core: PASS (0 failures, 25 checks). `qcbae://premiere` with Listen on
+  while Premiere played the 5.1 sequence three times: `LiveAudioSource: 2000
+  packets, resync-dropped 0, depth-dropped 18, scrub-silenced 0, queued 77
+  ms` — no resyncs, no stutter signature (the 18 depth drops are the three
+  session starts trimming to target). Device latency from the new log line:
+  WASAPI 22.0 ms (1056-frame buffer) vs CoreAudio 10.7 ms (512 frames), so
+  Windows sits ~11 ms deeper before the Live offset. Hearing it is still
+  owed by ear on the box (the session has no ears there).
+  `lab/results/2026-10-11-a8-windows/`.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 

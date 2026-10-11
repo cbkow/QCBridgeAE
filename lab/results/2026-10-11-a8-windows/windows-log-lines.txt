@@ -1,0 +1,108 @@
+### QCBridgeAE-Transmit.prm on Windows, Premiere Pro 2026 (build b75a204, VS 18 / MSVC 14.51): %TEMP%\qcbridgeae-transmit.log, 2026-10-11
+[16:15:42] instance 3264 disposed -> state 0
+[16:15:42] instance 4131 disposed -> state 0
+[16:15:43] instance 4135 disposed -> state 0
+[16:15:43] instance 4140 disposed -> state 0
+[16:15:43] instance 4144 disposed -> state 0
+[16:15:43] instance 4150 disposed -> state 0
+[16:15:43] instance 4154 disposed -> state 0
+[16:15:43] instance 4158 disposed -> state 0
+[16:15:43] instance 4163 disposed -> state 0
+[16:15:44] instance 4168 disposed -> state 0
+[16:15:45] instance 4172 disposed -> state 0
+[16:15:46] instance 4183 disposed -> state 0
+[16:15:46] instance 4187 disposed -> state 0
+[16:15:46] instance 4191 disposed -> state 0
+[16:15:46] instance 4195 disposed -> state 0
+[16:15:46] instance 4199 disposed -> state 0
+[16:15:46] instance 4203 disposed -> state 0
+[16:15:46] instance 4207 disposed -> state 0
+[16:15:46] instance 4211 disposed -> state 0
+[16:15:47] instance 4215 disposed -> state 0
+[16:15:47] instance 4219 disposed -> state 0
+[16:15:47] instance 4223 disposed -> state 0
+[16:15:47] instance 4227 disposed -> state 0
+[16:15:47] published 480 (3840x2160 BGRA)
+[16:15:47] instance 4231 disposed -> state 0
+[16:15:47] instance 4235 disposed -> state 0
+[16:15:47] instance 4239 disposed -> state 0
+[16:20:51] instance 4243 disposed -> state 0
+[16:20:51] instance 6246 disposed -> state 0
+[16:20:51] instance 6250 disposed -> state 0
+[16:20:51] instance 6254 disposed -> state 0
+[16:20:51] instance 6258 disposed -> state 0
+[16:24:28] instance 6262 disposed -> state 0
+[16:24:28] instance 7412 disposed -> state 0
+[16:24:28] instance 7419 disposed -> state 0
+[16:24:28] instance 7423 disposed -> state 0
+[16:24:29] instance 7427 disposed -> state 0
+[16:24:29] instance 7431 disposed -> state 0
+[16:24:29] instance 7435 disposed -> state 0
+[16:24:29] instance 7440 disposed -> state 0
+[16:24:33] instance 7447 disposed -> state 0
+[16:24:33] instance 7460 disposed -> state 0
+[16:24:33] instance 7464 disposed -> state 0
+[16:24:33] instance 7468 disposed -> state 0
+[16:24:33] instance 7472 disposed -> state 0
+[16:24:33] instance 7476 disposed -> state 0
+[16:24:34] instance 7480 disposed -> state 0
+[16:24:34] instance 7484 disposed -> state 0
+[16:24:34] instance 7488 disposed -> state 0
+[16:24:34] instance 7492 disposed -> state 0
+[16:24:34] instance 7496 disposed -> state 0
+[16:24:34] instance 7502 disposed -> state 0
+[16:24:34] instance 7506 disposed -> state 0
+[16:24:34] instance 7510 disposed -> state 0
+[16:24:35] instance 7514 disposed -> state 0
+[16:24:35] instance 7518 disposed -> state 0
+[16:24:46] instance 7522 disposed -> state 0
+[16:25:03] instance 7526 disposed -> state 0
+[16:25:04] instance 7530 disposed -> state 0
+[16:25:45] instance 7534 disposed -> state 0
+[16:25:45] instance 7538 disposed -> state 0
+[16:25:45] instance 7542 disposed -> state 0
+[16:25:45] instance 7546 disposed -> state 0
+[16:25:45] instance 7550 disposed -> state 0
+[16:25:45] instance 7554 disposed -> state 0
+[16:23:11] --- module load, host interface v4 ---
+[16:23:11] startup in After Effects: ring /qcbae-ae, ticks/s 254016000000
+[16:13:57] --- module load, host interface v4 ---
+[16:13:57] startup in Premiere Pro: ring /qcbae-premiere, ticks/s 254016000000
+[16:13:57] audio ring /qcbae-premiere-audio created: 128 slots x 1024 frames x 16 ch (8204 KiB)
+[16:14:07] instance 18068: 1280x720
+[16:14:18] published 1 (1280x720 BGRA); last 1: push mean 8.92 max 8.92 ms
+[16:14:18] instance 50006 disposed -> state 0
+[16:16:08] audio session: instance 18068 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+[16:18:39] audio session: instance 18068 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+[16:18:48] published 240 (1280x720 BGRA); last 220: push mean 1.09 max 2.48 ms, 21.91 fps
+[16:18:57] published 480 (1280x720 BGRA); last 240: push mean 1.06 max 1.57 ms, 25.00 fps
+[16:18:59] audio session ended: instance 18068, 938 pushes, 938 packets, 960512 frames x 6 ch, 0.000 s .. 19.989 s
+[16:20:11] audio session: instance 18068 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+[16:20:31] audio session ended: instance 18068, 938 pushes, 938 packets, 960512 frames x 6 ch, 0.000 s .. 19.989 s
+[16:20:34] audio session: instance 18068 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+[16:20:54] audio session ended: instance 18068, 938 pushes, 938 packets, 960512 frames x 6 ch, 0.000 s .. 19.989 s
+[16:20:57] audio session: instance 18068 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+[16:21:17] audio session ended: instance 18068, 938 pushes, 938 packets, 960512 frames x 6 ch, 0.000 s .. 19.989 s
+[16:24:34] audio session: instance 18068 at 0.000 s, speed 1.00, 6 ch 48000 Hz
+[16:24:47] published 2400 (1280x720 BGRA); last 240: push mean 1.00 max 1.56 ms, 25.00 fps
+[16:24:54] audio session ended: instance 18068, 938 pushes, 938 packets, 960512 frames x 6 ch, 0.000 s .. 19.989 s
+
+### QCView build-release (ab4f0f67) on Windows: %LOCALAPPDATA%\QCView\logs\qcview-log.txt
+[16:24:20.829 t=1384] I  WasapiAudioDevice: initialized (48000 Hz, 2 ch, buffer=1056 frames, 10 ms target)
+[16:24:23.038 t=1384] I  LiveAudioSource: watching /qcbae-premiere-audio
+[16:24:23.039 t=5576] I  HostBridgeSource: ring /qcbae-premiere open (producer pid 11360)
+[16:24:23.039 t=6876] I  LiveAudioSource: segment /qcbae-premiere-audio open (producer pid 11360, 128 slots x 1024 frames)
+[16:24:23.039 t=1384] I  AudioPlayer: live source playing, device buffer latency 22.0 ms
+[16:24:23.041 t=5576] I  HostBridgeSource: LIVE - first frame seq 2071 1280x720 RGBA16F row 10240 flags 0x0, centre (640,360) RGBA half bits 0000 0000 0000 0000
+[16:24:44.308 t=5576] I  HostBridgeSource: 240 frames 1280x720 in 21.27 s = 11.28 fps; ring copy mean 0.500 max 2.837 ms
+[16:24:53.906 t=5576] I  HostBridgeSource: 240 frames 1280x720 in 9.60 s = 25.01 fps; ring copy mean 0.467 max 2.862 ms
+
+### ctest (C:\qcb-lab\ae-build.log)
+1/6 Test #1: ring_tearing .....................   Passed    0.06 sec
+2/6 Test #2: convert ..........................   Passed    0.03 sec
+3/6 Test #3: ring_unit ........................   Passed    1.57 sec
+4/6 Test #4: audio_ring_unit ..................   Passed    1.57 sec
+5/6 Test #5: audio_tearing ....................   Passed   29.87 sec
+6/6 Test #6: audio_quiesce ....................   Passed    6.03 sec
+100% tests passed, 0 tests failed out of 6
+Total Test time (real) =  39.29 sec

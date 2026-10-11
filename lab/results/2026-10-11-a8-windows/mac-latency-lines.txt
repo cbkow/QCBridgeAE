@@ -1,0 +1,6 @@
+### QCView dev build (ab4f0f67) on the Mac, qcbae://premiere with Premiere quit, 2026-10-11
+CoreAudioDevice: initialized (48000 Hz, 2 ch, buffer=512 frames)
+LiveAudioSource: watching /qcbae-premiere-audio
+LiveAudioSource: segment /qcbae-premiere-audio open (producer pid 2009, 128 slots x 1024 frames)
+LiveAudioSource: removed the segment a dead producer left (/qcbae-premiere-audio)
+AudioPlayer: live source playing, device buffer latency 10.7 ms
