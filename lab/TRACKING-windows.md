@@ -1024,7 +1024,7 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   vendored copy (`8be0d290`) is owed a Windows build with the next QCView
   item.
 
-- [ ] **QCView — the output bus's D3D11 twin (added 2026-10-11, QCView
+- [x] **QCView — the output bus's D3D11 twin (added 2026-10-11, QCView
   main `5f5ea6f1`, QCBridgeN/PLAN.md P2/P4).** The bus itself (window/
   output_bus.*: manifests under `%ProgramData%\QCView\Outputs`, rings,
   the plugin process, request/reply, the audio tap in AudioPlayer and the
@@ -1040,8 +1040,17 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   consume` (build it on the box: QCBridgeN `tools/qcvo-probe`) reading
   frames at the source rate with the clip's pixels, as the Mac run in
   QCBridgeN `lab/results/2026-10-11-p2-bus/`.
+  *Windows 2026-10-11:* done, QCView `f4f43840` (`df75402c` + two include/
+  order fixes). The D3D11 pass: compositor or dual compositor again at the
+  sink's raster (prepared sources kept with consume=false, `releasePrepared`
+  after), the SDR-capture OCIO instances, BGRA8 target + guides/strokes,
+  CopyResource to staging, Map(DO_NOT_WAIT) at the next frame and one
+  memcpy into the slot. With QCBridgeN as the sink and `ndi-recv` on the
+  same box: **1920x1080 at 25.00 fps, 48 kHz stereo, 300 frames in 12 s**,
+  `output publish (…): changed frames` once per source frame, the sink
+  quit with QCView. QCBridgeN `lab/results/2026-10-11-p4-windows/`.
 
-- [ ] **QCBridgeN on Windows (added 2026-10-11, QCBridgeN `f422ca3`,
+- [x] **QCBridgeN on Windows (added 2026-10-11, QCBridgeN `f422ca3`,
   PLAN.md P3/P4).** After the D3D11 output pass above lands: build the
   repo on the box (`cmake -DCMAKE_PREFIX_PATH=C:\Qt\6.11.1\msvc2022_64
   -DNDI_SDK_DIR="C:\Program Files\NDI\NDI 6 SDK"`; `src/sink/ndi_lib.cpp`
@@ -1051,6 +1060,14 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   (`lab/results/2026-10-11-p3-ndi/` there): 1080p at the clip's rate, 48
   kHz audio, the frame is the clip. `qcvo-probe` builds there without the
   SDK and tests the bus alone.
+  *Windows 2026-10-11:* done. Built on the box (Ninja, VS 18, Qt msvc2022_64,
+  NDI 6 SDK found at its default path) first try; the run above is its
+  stream. `packaging/windows/build-setup.cmd` (windeployqt trimmed to
+  Core/Gui/Widgets + platforms/styles, the NDI runtime DLL and its licences
+  beside the exe, vc_redist run quietly by Inno) made
+  `dist/QCBridgeN-0.0.1-Setup-x64.exe` (30 MB, copied to the Mac, hash
+  matches). Not installed on the box (UAC); the test used the staged exe
+  through a dev manifest directory.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
