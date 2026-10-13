@@ -1096,6 +1096,18 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   signing), QCBridgeN Setup, QCBridgeAE Setup. The Windows stream encoder
   (Media Foundation, plan A2) is not in 2.5.6; the Stream block reports
   "unavailable" there.
+- **Stream notes B2 on D3D11** (QCView cfef02aa, 2026-10-13). Written to
+  the Metal shape, never compiled or run on the box: `m_viewBypass` gates
+  `useOcio` in drawFrame, the capture (warmCaptureOcio + the capture pass),
+  the output pass and the scope tap; the present bypass branch passes
+  `applyBrightness = false` and `encodeSource = true`; the compositor's
+  constant buffer gained `encodeSource` in place of half the tail padding
+  (size still 160) and the pixel shader runs `encodeFill` over the source
+  when set. Verify: build; Premiere feed → Space freezes, the frame holds,
+  Esc resumes; a capture in Review equals the note's PNG; with the HDR
+  swapchain (scRGB and PQ) the Review picture matches the live picture's
+  brightness, not a linear-read sRGB PNG; the NDI sink shows the frozen
+  frame. Lab note: `lab/results/2026-10-13-stream-notes-b2/`.
 
 ## Done
 
