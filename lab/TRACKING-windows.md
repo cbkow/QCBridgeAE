@@ -1084,6 +1084,14 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   a dev manifest (`QCV_OUTPUT_MANIFEST_DIR`). Lab:
   QCBridgeA `lab/results/2026-10-13-aja-step0/`. Trap: `qcvo-probe` never
   ran on Windows before today (setvbuf fail-fast, fixed in both repos).
+  *Windows 2026-10-13 17:25:* the device came free and the sink ran 12 s of
+  AutoCirculate at 1080p25, **10-bit RGB** (RGB10 on the bus, QCBridgeA
+  5a0e24d / QCView 8a61424d), 25/s, card level 2–3, 0 drops; QCView's
+  D3D11 output pass at RGB10 verified against its BGRA8 pass (max 1 code
+  value, 62 % sub-8-bit detail; QCBridgeA `lab/results/2026-10-13-aja-rgb10/`).
+  Still owed: a look at the SDI/HDMI monitor, 23.976, audio by ear,
+  start/stop, the hand-off with Adobe's plugin, QCView itself as the
+  producer.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
