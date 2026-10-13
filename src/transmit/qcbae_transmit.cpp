@@ -207,7 +207,7 @@ AudioPublisher S_audio;
 // host thread for one summary line per session. Nothing here logs.
 struct AudioStats {
     std::atomic<uint64_t> pushes{0}, frames{0}, packets{0};
-    std::atomic<int64_t>  first_time{0}, last_time{0};
+    std::atomic<int64_t>  first_time{0};
     std::atomic<uint32_t> channels{0};
 };
 AudioStats S_astats;
@@ -697,7 +697,7 @@ tmResult StartPushAudio(const tmStdParms* sp, const tmInstance* inst, PrTime sta
         s.flags       = (loop ? kAudioSessionLoop : 0u) | (scrubbing ? kAudioSessionScrubbing : 0u);
         s.push_frames = kDefaultAudioSlotFrames;
         S_astats.pushes = 0; S_astats.frames = 0; S_astats.packets = 0;
-        S_astats.first_time = start; S_astats.last_time = start; S_astats.channels = s.channels;
+        S_astats.first_time = start; S_astats.channels = s.channels;
         S_playing_without_audio = 0;
         S_push_flags.store(scrubbing ? kAudioPacketScrubbing : 0u, std::memory_order_relaxed);
         if (const Plugin* P = plugin(sp)) ensure_audio_ring(P->ticks_per_second);
@@ -727,7 +727,6 @@ tmResult PushAudio(const tmStdParms*, const tmInstance* inst, const tmPushAudio*
         S_astats.pushes.fetch_add(1, std::memory_order_relaxed);
         S_astats.frames.fetch_add(a->inNumSamples, std::memory_order_relaxed);
         S_astats.packets.fetch_add(n, std::memory_order_relaxed);
-        S_astats.last_time.store(a->inTime, std::memory_order_relaxed);
     }
     return tmResult_Success;
 }
@@ -740,13 +739,20 @@ tmResult StopPushAudio(const tmStdParms* sp, const tmInstance* inst) {
             const Plugin* P = plugin(sp);
             const double tps = P != nullptr && P->ticks_per_second > 0 ? static_cast<double>(P->ticks_per_second) : 1.0;
             const uint64_t frames = S_astats.frames.load(std::memory_order_relaxed);
-            if (frames > 0)
-                logf("audio session ended: instance %d, %llu pushes, %llu packets, %llu frames x %u ch, %.3f s .. %.3f s",
+            if (frames > 0) {
+                // The span's end is the start plus the frames pushed: the
+                // host's tmPushAudio::inTime is a PrTime by type but does not
+                // read as the sequence time in the video tick base (a 36 s
+                // session at 1167 s ended at "-310 s" through it, 2026-10-12).
+                const double startSec = static_cast<double>(S_astats.first_time.load()) / tps;
+                const uint32_t rate = inst->inAudioSampleRate > 0 ? static_cast<uint32_t>(inst->inAudioSampleRate + 0.5f) : 48000u;
+                const double spanSec = static_cast<double>(frames) / static_cast<double>(rate);
+                logf("audio session ended: instance %d, %llu pushes, %llu packets, %llu frames x %u ch, %.3f s .. %.3f s (%.1f s)",
                      inst->inInstanceID, (unsigned long long)S_astats.pushes.load(std::memory_order_relaxed),
                      (unsigned long long)S_astats.packets.load(std::memory_order_relaxed),
                      (unsigned long long)frames, S_astats.channels.load(),
-                     static_cast<double>(S_astats.first_time.load()) / tps,
-                     static_cast<double>(S_astats.last_time.load()) / tps);
+                     startSec, startSec + spanSec, spanSec);
+            }
         }
         return tmResult_Success;
     });

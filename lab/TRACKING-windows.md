@@ -1087,6 +1087,15 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   Mac inherits — flagged. Replica stream into QCView on Windows: d3d11va
   zero-copy, capture+mux ~0.05 cores. QCBridge
   `spikes/parity/results/2026-09-23-windows-agent/` §S7.
+- **Release cycle for all three repos** (2026-10-12). Versions are bumped on
+  main and nothing is built or tagged yet: QCView 2.5.6 (stream output on
+  macOS, Output section, notes on live feeds, live audio priming, transport
+  keys and dual fixes for live feeds), QCBridgeN 0.0.2 (ndi-recv only),
+  QCBridgeAE 0.3.2 (the audio-session log span). Each needs its Windows
+  build and installer in the same cycle: QCView MSIX (and the sideload
+  signing), QCBridgeN Setup, QCBridgeAE Setup. The Windows stream encoder
+  (Media Foundation, plan A2) is not in 2.5.6; the Stream block reports
+  "unavailable" there.
 
 ## Done
 
