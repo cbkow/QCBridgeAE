@@ -1089,9 +1089,14 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   5a0e24d / QCView 8a61424d), 25/s, card level 2–3, 0 drops; QCView's
   D3D11 output pass at RGB10 verified against its BGRA8 pass (max 1 code
   value, 62 % sub-8-bit detail; QCBridgeA `lab/results/2026-10-13-aja-rgb10/`).
-  Still owed: a look at the SDI/HDMI monitor, 23.976, audio by ear,
-  start/stop, the hand-off with Adobe's plugin, QCView itself as the
-  producer.
+  *Windows 2026-10-13 18:14:* QCView itself as the producer, at **PQ
+  Rec.2100** through the ACES "HDR 1000 nits (P3 D65)" view with P3-D65
+  metadata, 30 s on the T-TAP Pro — Chris saw it on the monitor. The
+  D3D11 output pass verified at SDR / PQ (re-rendered and pass-through) /
+  HLG against four probe consumers (QCBridgeA `lab/results/2026-10-13-aja-hdr/`);
+  fixed on the way: an HDR output held until its worker-built chain exists.
+  Still owed: 23.976, audio by ear, start/stop, the hand-off with Adobe's
+  plugin, a Premiere PQ feed passed through.
 
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
