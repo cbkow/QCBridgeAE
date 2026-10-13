@@ -1096,18 +1096,20 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   signing), QCBridgeN Setup, QCBridgeAE Setup. The Windows stream encoder
   (Media Foundation, plan A2) is not in 2.5.6; the Stream block reports
   "unavailable" there.
-- **Stream notes B2 on D3D11** (QCView cfef02aa, 2026-10-13). Written to
-  the Metal shape, never compiled or run on the box: `m_viewBypass` gates
-  `useOcio` in drawFrame, the capture (warmCaptureOcio + the capture pass),
-  the output pass and the scope tap; the present bypass branch passes
-  `applyBrightness = false` and `encodeSource = true`; the compositor's
-  constant buffer gained `encodeSource` in place of half the tail padding
-  (size still 160) and the pixel shader runs `encodeFill` over the source
-  when set. Verify: build; Premiere feed → Space freezes, the frame holds,
-  Esc resumes; a capture in Review equals the note's PNG; with the HDR
-  swapchain (scRGB and PQ) the Review picture matches the live picture's
-  brightness, not a linear-read sRGB PNG; the NDI sink shows the frozen
-  frame. Lab note: `lab/results/2026-10-13-stream-notes-b2/`.
+- ~~**Stream notes B2 on D3D11**~~ — **done on the box 2026-10-13** (QCView
+  2a20437d): builds under VS 18; an SRT feed of the burn-in clip, the note
+  freezes the feed (`view transform bypassed`), a capture taken in Review
+  equals the note's PNG byte for byte, Esc / exitReview restores the
+  transform. Still open: the Review picture on an scRGB / PQ swapchain
+  (`encodeSource`), and the Premiere feed on the box. Rig:
+  `C:\qcb-lab\b2-run.cmd`.
+- ~~**Stream output A2: Media Foundation**~~ — **done on the box 2026-10-13**
+  (QCView 71666829 + 44be3223 + 2a20437d): NVIDIA H.264 Encoder MFT on the
+  renderer's device, 6.05 Mbps, GOP 30, exact pts, picture within 1 code
+  value of the source; QCBridgeN
+  `lab/results/2026-10-13-stream-a2-windows/`. Rig: `C:\qcb-lab\a2-run.cmd`.
+  Open: the stream and the NDI sink together, HDR swapchain modes, Louper
+  from the box.
 
 ## Done
 
