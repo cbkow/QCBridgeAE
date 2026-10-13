@@ -1110,6 +1110,15 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   `lab/results/2026-10-13-stream-a2-windows/`. Rig: `C:\qcb-lab\a2-run.cmd`.
   Open: the stream and the NDI sink together, HDR swapchain modes, Louper
   from the box.
+- **minNotes plan C on Windows** (minNotes 205da7d, 2026-10-13). Stream
+  folders open as documents, the notes model's `sidecarDir` mode, notes as
+  blocks, and the player's `abuffersink` setup replaced with QCView's
+  (array options; builds against FFmpeg 7.1–9). Built and run headless on
+  the Mac only. Verify on the box: the release preset builds against the
+  vendored FFmpeg 8; `minNotes <stream folder>` creates `<name>.mnd` with
+  the notes; QCView's **Open in minNotes** (the `minnotes:` scheme the
+  Setup registers) reaches the running instance through the single-
+  instance socket.
 
 ## Done
 
