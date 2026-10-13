@@ -1069,6 +1069,22 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   matches). Not installed on the box (UAC); the test used the staged exe
   through a dev manifest directory.
 
+- [ ] **QCBridgeA on Windows — the AJA sink's playout (added 2026-10-13,
+  QCBridgeA `3b39bfe`, PLAN.md A2–A6).** The repository exists locally
+  (no GitHub remote yet) and the box has a copy beside a standalone
+  `libajantv2` `ntv2_17_5` build (`C:\qcb-lab\build-ajantv2.cmd`,
+  `C:\qcb-lab\build-qcba.cmd`). The sink builds and runs against
+  `qcvo-probe produce` on the desktop session (`C:\qcb-lab\aja-t1.cmd`
+  through run.ps1): attaches, is accepted, heartbeats steadily, and reports
+  "T-TAP Pro is in use by AfterFX.exe" — After Effects' AJA Transmit held
+  the device all afternoon, so no picture reached the T-TAP yet. Owed once
+  the device is free: the probe at 25 and 23.976 fps on the SDI/HDMI
+  monitor, audio continuity (the probe's tone), start/stop 20×, quit while
+  attached, the hand-off back to Adobe's plugin, then QCView itself through
+  a dev manifest (`QCV_OUTPUT_MANIFEST_DIR`). Lab:
+  QCBridgeA `lab/results/2026-10-13-aja-step0/`. Trap: `qcvo-probe` never
+  ran on Windows before today (setvbuf fail-fast, fixed in both repos).
+
 ## Parked on the macOS side — not Windows work, but do not be surprised by it
 
 - **Zero-copy ingest** (QCBridgeAE). Measured 2026-09-22 and parked: saves
