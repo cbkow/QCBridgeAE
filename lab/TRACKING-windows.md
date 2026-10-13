@@ -1110,15 +1110,17 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   `lab/results/2026-10-13-stream-a2-windows/`. Rig: `C:\qcb-lab\a2-run.cmd`.
   Open: the stream and the NDI sink together, HDR swapchain modes, Louper
   from the box.
-- **minNotes plan C on Windows** (minNotes 205da7d, 2026-10-13). Stream
-  folders open as documents, the notes model's `sidecarDir` mode, notes as
-  blocks, and the player's `abuffersink` setup replaced with QCView's
-  (array options; builds against FFmpeg 7.1–9). Built and run headless on
-  the Mac only. Verify on the box: the release preset builds against the
-  vendored FFmpeg 8; `minNotes <stream folder>` creates `<name>.mnd` with
-  the notes; QCView's **Open in minNotes** (the `minnotes:` scheme the
-  Setup registers) reaches the running instance through the single-
-  instance socket.
+- ~~**minNotes plan C on Windows**~~ — **built and run on the box 2026-10-13**
+  (minNotes 323521e, release preset, VS 18, vendored FFmpeg 8): `minNotes.exe
+  --shot <stream folder>` on the B2 stream folder created
+  `127.0.0.1_9100.mnd` with the notes and rendered the shot, through the
+  desktop runner. Two things learned: the exe needs `external\kf6\bin`,
+  `external\ffmpeg\bin` and the `build\` WinSparkle.dll on PATH when run
+  from the tree (windeployqt is the installer's job), and
+  `QT_QPA_PLATFORM=offscreen` fail-fasts at start on this box (0xC0000409),
+  so headless checks run on the desktop instead. Still open: the Windows
+  Setup for 1.0.3 and QCView's **Open in minNotes** through the installed
+  `minnotes:` scheme and the single-instance socket.
 
 ## Done
 
