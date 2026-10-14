@@ -1125,6 +1125,10 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   signing), QCBridgeN Setup, QCBridgeAE Setup. The Windows stream encoder
   (Media Foundation, plan A2) is not in 2.5.6; the Stream block reports
   "unavailable" there.
+- **QCBridgeAE 0.3.3** (2026-10-14): the Transmit device is named in ASCII,
+  "QCBridgeAE to QCView" — After Effects' Video Preview list dropped the
+  arrow (a18c037). Needs its Windows Setup in the next cycle; the GUID is
+  unchanged, so an existing tick in Preferences survives the update.
 - ~~**Stream notes B2 on D3D11**~~ — **done on the box 2026-10-13** (QCView
   2a20437d): builds under VS 18; an SRT feed of the burn-in clip, the note
   freezes the feed (`view transform bypassed`), a capture taken in Review
