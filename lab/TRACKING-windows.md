@@ -1157,6 +1157,22 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   Setup for 1.0.3 and QCView's **Open in minNotes** through the installed
   `minnotes:` scheme and the single-instance socket.
 
+- **QCView 2.5.7 on Windows (2026-10-14)** — built on the box from 1ba4c106
+  + 8d3f0c93 (AJA output, per-output transfer and raster, Output cards,
+  File ▸ Exit, two QML binding loops): Store MSIX
+  `QCView-2.5.7-win64.msix` and the signed sideload twin + `QCView-dev.cer`
+  in `C:\qcb-lab\rel257\` (signtool verified) and beside the notarized DMG
+  in the Mac checkout's `build/dist/`. Chris confirmed File ▸ Exit on the
+  box. Open: the GitHub release, the appcast and the Store upload (Chris);
+  the UHD monitor info page; UHD above 30p.
+- **QCBridgeA 0.0.1 Windows Setup (2026-10-14)** — `packaging\windows\
+  build-setup.cmd` on the box → `dist\QCBridgeA-0.0.1-Setup-x64.exe` (Inno,
+  one exe on the static runtime, writes `%ProgramData%\QCView\Outputs\
+  aja.json`); the static exe ran the T-TAP Pro switch rig and a 23.976
+  reconfigure. Open: run the Setup itself on the box (install, QCView lists
+  the output, uninstall removes the manifest); the GitHub repo, tag and
+  release (Chris).
+
 ## Done
 
 - [x] **QCBridgeAE A1–A4, A6, A3** — macOS. Listed for orientation, not as
