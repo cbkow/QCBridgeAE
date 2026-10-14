@@ -1127,8 +1127,10 @@ right now — dual live landed on 2026-09-22 and has its own section above.
   "unavailable" there.
 - **QCBridgeAE 0.3.3** (2026-10-14): the Transmit device is named in ASCII,
   "QCBridgeAE to QCView" — After Effects' Video Preview list dropped the
-  arrow (a18c037). Needs its Windows Setup in the next cycle; the GUID is
-  unchanged, so an existing tick in Preferences survives the update.
+  arrow (a18c037). `dist/QCBridgeAE-0.3.3-Setup-x64.exe` built on the box
+  2026-10-14 (ctest passed, hash matches the Mac copy); the pkg is notarized
+  and stapled. The GUID is unchanged, so an existing tick in Preferences
+  survives the update. Tag v0.3.3 + release: Chris.
 - ~~**Stream notes B2 on D3D11**~~ — **done on the box 2026-10-13** (QCView
   2a20437d): builds under VS 18; an SRT feed of the burn-in clip, the note
   freezes the feed (`view transform bypassed`), a capture taken in Review
