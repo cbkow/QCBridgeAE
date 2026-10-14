@@ -6,7 +6,7 @@
 QCView alongside the picture. Premiere keeps playing through its own audio
 device; the plugin receives a copy. Switch it on per device: Preferences →
 Playback → Transmit Device Playback → tick **Audio Stream** next to
-"QCBridgeAE → QCView". After Effects does not send audio to Transmit
+"QCBridgeAE to QCView". After Effects does not send audio to Transmit
 devices (its own limitation, measured in
 `lab/results/2026-10-10-a8-transmit-audio/`).
 

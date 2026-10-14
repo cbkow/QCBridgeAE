@@ -3,7 +3,7 @@
 set -u
 echo "QCBridgeAE uninstaller"
 echo
-echo "This removes the QCBridgeAE → QCView device from Adobe's MediaCore"
+echo "This removes the QCBridgeAE to QCView device from Adobe's MediaCore"
 echo "folder. Quit After Effects and Premiere Pro first. It will ask for"
 echo "your password."
 read -r -p "Continue? [y/N] " yn

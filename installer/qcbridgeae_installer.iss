@@ -7,7 +7,7 @@
 ;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\qcbridgeae_installer.iss
 ; → dist\QCBridgeAE-<version>-Setup-x64.exe
 #define MyAppName "QCBridgeAE"
-#define MyAppVersion "0.3.2"
+#define MyAppVersion "0.3.3"
 #define MyAppPublisher "cbkow"
 #define MyAppURL "https://github.com/cbkow/QCBridgeAE"
 #define PluginFile "QCBridgeAE-Transmit.prm"
@@ -44,7 +44,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
 ; Shown on the welcome page under the title.
-WelcomeLabel2=This will install the QCBridgeAE → QCView video preview device for After Effects and Premiere Pro.%n%nQuit After Effects and Premiere Pro before continuing; they load devices at launch.
+WelcomeLabel2=This will install the QCBridgeAE to QCView video preview device for After Effects and Premiere Pro.%n%nQuit After Effects and Premiere Pro before continuing; they load devices at launch.
 
 [Files]
 Source: "..\build-release\{#PluginFile}"; DestDir: "{commonpf}\Adobe\Common\Plug-ins\7.0\MediaCore"; Flags: ignoreversion

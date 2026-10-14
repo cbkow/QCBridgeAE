@@ -430,7 +430,9 @@ tmResult Startup(tmStdParms* sp, tmPluginInfo* info) {
         info->outClockAvailable      = kPrFalse;   // video only; the host keeps the clock
         info->outVideoAvailable      = kPrTrue;
         info->outVideoDefaultEnabled = kPrFalse;   // the user opts in, in Preferences
-        const char16_t name[] = u"QCBridgeAE → QCView";
+        // Plain ASCII: After Effects' Video Preview list drops characters
+        // outside its code page (the arrow this once was never showed there).
+        const char16_t name[] = u"QCBridgeAE to QCView";
         static_assert(sizeof(prUTF16Char) == sizeof(char16_t), "prUTF16Char is UTF-16");
         std::memcpy(info->outDisplayName, name, sizeof name);
         info->outHideInUI            = kPrFalse;
